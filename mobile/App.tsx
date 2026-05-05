@@ -11,7 +11,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
-import { CameraView, CameraType, FlashMode, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { Camera, useCameraDevice, useCameraPermission, type CameraRef } from 'react-native-vision-camera';
 import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,7 +58,6 @@ type SelectedFile = {
   sizeBytes: number | null;
 };
 
-type CaptureMode = 'photo' | 'video';
 type AppScreen = 'camera' | 'preview' | 'uploading' | 'done' | 'gallery';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -101,23 +100,19 @@ const formatBytes = (bytes: number): string => {
 
 function VibeCam() {
   const insets = useSafeAreaInsets();
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('back');
+  const cameraRef = useRef<CameraRef>(null);
 
   const [screen, setScreen] = useState<AppScreen>('camera');
   const [backendReady, setBackendReady] = useState(false);
-  const [facing, setFacing] = useState<CameraType>('back');
-  const [flash, setFlash] = useState<FlashMode>('off');
-  const [mode, setMode] = useState<CaptureMode>('photo');
-  const [cameraReady, setCameraReady] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [payloadHash, setPayloadHash] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
 
-  const cameraRef = useRef<CameraView>(null);
   const shutterScale = useSharedValue(1);
   const shutterStyle = useAnimatedStyle(() => ({ transform: [{ scale: shutterScale.value }] }));
 
@@ -127,59 +122,41 @@ function VibeCam() {
 
   // ─── Camera ──────────────────────────────────────────────────────────────
 
-  const toggleFacing = useCallback(() => setFacing((f) => (f === 'back' ? 'front' : 'back')), []);
-  const toggleFlash = useCallback(() => setFlash((f) => (f === 'off' ? 'on' : 'off')), []);
-
   const onPressIn = useCallback(() => {
     shutterScale.value = withSpring(0.85, { damping: 15, stiffness: 300 });
   }, [shutterScale]);
+
   const onPressOut = useCallback(() => {
     shutterScale.value = withSpring(1, { damping: 12, stiffness: 200 });
   }, [shutterScale]);
 
-  const capture = useCallback(async () => {
-    if (!cameraRef.current || !cameraReady) return;
-    setError('');
-
-    if (mode === 'photo') {
-      try {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
-        if (!photo?.uri) throw new Error('Capture failed');
-        const f = new File(photo.uri);
-        const info = f.info();
-        setSelectedFile({ uri: photo.uri, name: `photo-${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: info.exists && typeof info.size === 'number' ? info.size : null });
-        setScreen('preview');
-      } catch (e) { setError(e instanceof Error ? e.message : 'Capture failed'); }
-    } else {
-      if (isRecording) {
-        cameraRef.current.stopRecording();
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else {
-        if (!micPermission?.granted) {
-          const r = await requestMicPermission();
-          if (!r.granted) { setError('Microphone required'); return; }
-        }
-        setIsRecording(true);
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        try {
-          const video = await cameraRef.current.recordAsync({ maxDuration: 30 });
-          if (!video?.uri) throw new Error('Recording failed');
-          const f = new File(video.uri);
-          const info = f.info();
-          setSelectedFile({ uri: video.uri, name: `video-${Date.now()}.mp4`, mimeType: 'video/mp4', sizeBytes: info.exists && typeof info.size === 'number' ? info.size : null });
-          setScreen('preview');
-        } catch (e) { setError(e instanceof Error ? e.message : 'Recording failed'); }
-        finally { setIsRecording(false); }
-      }
+  const takePhoto = useCallback(async () => {
+    if (!cameraRef.current) return;
+    try {
+      const snapshot = await cameraRef.current.takeSnapshot();
+      const path = await snapshot.saveToTemporaryFileAsync('jpg', 90);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setCapturedImage(path);
+      const f = new File(`file://${path}`);
+      const info = f.info();
+      setSelectedFile({
+        uri: `file://${path}`,
+        name: `photo-${Date.now()}.jpg`,
+        mimeType: 'image/jpeg',
+        sizeBytes: info.exists && typeof info.size === 'number' ? info.size : null,
+      });
+      setScreen('preview');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Capture failed');
     }
-  }, [cameraReady, mode, isRecording, micPermission, requestMicPermission]);
+  }, []);
 
   const pickFile = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false, type: '*/*' });
       if (result.canceled) return;
       const file = result.assets[0];
+      setCapturedImage(file.mimeType?.startsWith('image/') ? file.uri : null);
       setSelectedFile({ uri: file.uri, name: file.name || 'file.bin', mimeType: (file.mimeType || 'application/octet-stream').toLowerCase(), sizeBytes: file.size ?? null });
       setScreen('preview');
     } catch (e) { setError(e instanceof Error ? e.message : 'File selection failed'); }
@@ -229,30 +206,40 @@ function VibeCam() {
     setScreen('gallery');
   }, []);
 
-  const reset = useCallback(() => { setSelectedFile(null); setUploadProgress(0); setPayloadHash(null); setError(''); setScreen('camera'); }, []);
+  const reset = useCallback(() => {
+    setCapturedImage(null); setSelectedFile(null); setUploadProgress(0); setPayloadHash(null); setError(''); setScreen('camera');
+  }, []);
 
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
-  if (!cameraPermission?.granted) {
+  // Permission
+  if (!hasPermission) {
     return (
-      <View style={st.dark}><StatusBar style="light" />
-        <View style={st.center}>
-          <Text style={st.brandMark}>V</Text>
-          <Text style={st.permTitle}>VibeCam</Text>
-          <Text style={st.permBody}>Camera access is needed to capture moments.</Text>
-          <Pressable style={st.pill} onPress={requestCameraPermission}><Text style={st.pillText}>Enable Camera</Text></Pressable>
-        </View>
+      <View style={st.perm}><StatusBar style="light" />
+        <Pressable style={st.permBtn} onPress={requestPermission}>
+          <Text style={st.permBtnT}>Grant Camera Access</Text>
+        </Pressable>
       </View>
     );
   }
 
+  // No device
+  if (!device) {
+    return (
+      <View style={st.perm}><StatusBar style="light" />
+        <Text style={st.muted}>No camera device available</Text>
+      </View>
+    );
+  }
+
+  // Gallery
   if (screen === 'gallery') {
     return (
       <View style={st.dark}><StatusBar style="light" />
         <View style={[st.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={reset}><Text style={st.back}>←</Text></Pressable>
-          <Text style={st.headerTitle}>Uploads</Text>
+          <Text style={st.headerT}>Uploads</Text>
           <View style={{ width: 32 }} />
         </View>
         {gallery.length === 0 ? (
@@ -272,6 +259,7 @@ function VibeCam() {
     );
   }
 
+  // Done
   if (screen === 'done') {
     return (
       <View style={st.dark}><StatusBar style="light" />
@@ -288,6 +276,7 @@ function VibeCam() {
     );
   }
 
+  // Uploading
   if (screen === 'uploading') {
     return (
       <View style={st.dark}><StatusBar style="light" />
@@ -300,70 +289,56 @@ function VibeCam() {
     );
   }
 
+  // Preview (captured photo or picked file)
   if (screen === 'preview' && selectedFile) {
     const isImg = selectedFile.mimeType.startsWith('image/');
     return (
       <View style={st.dark}><StatusBar style="light" />
-        {isImg ? <Image source={{ uri: selectedFile.uri }} style={st.prevImg} /> : (
+        {isImg && capturedImage ? (
+          <Image source={{ uri: capturedImage.startsWith('file://') ? capturedImage : `file://${capturedImage}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : isImg ? (
+          <Image source={{ uri: selectedFile.uri }} style={st.prevImg} />
+        ) : (
           <View style={st.center}><Text style={st.fName}>{selectedFile.name}</Text><Text style={st.muted}>{selectedFile.sizeBytes ? formatBytes(selectedFile.sizeBytes) : ''} · {selectedFile.mimeType}</Text></View>
         )}
         {error.length > 0 && <Text style={st.errFloat}>{error}</Text>}
+        <View style={[st.prevTop, { paddingTop: insets.top + 12 }]}>
+          <Pressable onPress={reset} hitSlop={12}><Text style={st.prevAction}>Retake</Text></Pressable>
+          <Pressable hitSlop={12}><Text style={st.prevAction}>Apply Vibe</Text></Pressable>
+        </View>
         <View style={[st.prevBar, { paddingBottom: insets.bottom + 16 }]}>
-          <Pressable style={st.btnO} onPress={reset}><Text style={st.btnOT}>Retake</Text></Pressable>
-          <Pressable style={[st.btnS, !backendReady && st.dis]} disabled={!backendReady} onPress={uploadFile}><Text style={st.btnST}>Upload</Text></Pressable>
+          <Pressable style={[st.btnS, !backendReady && st.dis]} disabled={!backendReady} onPress={uploadFile}>
+            <Text style={st.btnST}>Upload</Text>
+          </Pressable>
         </View>
       </View>
     );
   }
 
 
-  // Camera
+  // Camera (main)
   return (
     <View style={st.cam}><StatusBar style="light" />
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        facing={facing}
-        flash={flash}
-        mode={mode === 'video' ? 'video' : 'picture'}
-        videoQuality="720p"
-        onCameraReady={() => setCameraReady(true)}
-        onMountError={(e) => setError(e.message)}
-      />
+      <Camera ref={cameraRef} style={StyleSheet.absoluteFill} device={device} isActive={screen === 'camera'} />
 
       {/* Top */}
       <View style={[st.topBar, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={toggleFlash} style={st.topBtn} hitSlop={12}>
-          <View style={[st.flashDot, flash === 'on' && st.flashOn]} />
-        </Pressable>
+        <View style={st.topBtn}><View style={st.flashDot} /></View>
         <View style={[st.dot, backendReady ? st.dotG : st.dotR]} />
-        <Pressable onPress={toggleFacing} style={st.topBtn} hitSlop={12}>
-          <View style={st.flipDot} />
-        </Pressable>
+        <View style={st.topBtn}><View style={st.flipDot} /></View>
       </View>
 
       {error.length > 0 && <View style={st.toast}><Text style={st.toastT}>{error}</Text></View>}
 
       {/* Bottom */}
       <View style={[st.bot, { paddingBottom: insets.bottom + 20 }]}>
-        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-
-        {/* Mode toggle */}
-        <View style={st.modeRow}>
-          <Pressable onPress={() => setMode('photo')} disabled={isRecording}>
-            <Text style={[st.modeT, mode === 'photo' && st.modeA]}>PHOTO</Text>
-          </Pressable>
-          <Pressable onPress={() => setMode('video')} disabled={isRecording}>
-            <Text style={[st.modeT, mode === 'video' && st.modeA]}>VIDEO</Text>
-          </Pressable>
-        </View>
-
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={st.botRow}>
           <Pressable onPress={openGallery} style={st.sideBtn}><View style={st.thumbPh} /></Pressable>
 
-          <Pressable onPress={capture} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!cameraReady}>
+          <Pressable onPress={takePhoto} onPressIn={onPressIn} onPressOut={onPressOut}>
             <Animated.View style={[st.shOuter, shutterStyle]}>
-              <View style={[st.shInner, mode === 'video' && isRecording && st.shRec]} />
+              <View style={st.shInner} />
             </Animated.View>
           </Pressable>
 
@@ -387,45 +362,40 @@ const st = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
 
   // Permission
-  brandMark: { fontSize: 52, fontWeight: '200', color: '#fff', marginBottom: 4 },
-  permTitle: { fontSize: 26, fontWeight: '300', color: '#fff', letterSpacing: 0.5, marginBottom: 12 },
-  permBody: { fontSize: 15, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 22, marginBottom: 36 },
-  pill: { backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: 36, borderRadius: 999 },
-  pillText: { color: '#0a0a0a', fontSize: 15, fontWeight: '600' },
+  perm: { flex: 1, backgroundColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center' },
+  permBtn: { backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: 32, borderRadius: 999 },
+  permBtnT: { color: '#0a0a0a', fontSize: 15, fontWeight: '600' },
 
   // Top bar
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24 },
   topBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' },
   flashDot: { width: 4, height: 14, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 2 },
-  flashOn: { backgroundColor: '#fbbf24' },
   flipDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
   dot: { width: 6, height: 6, borderRadius: 3 },
   dotG: { backgroundColor: '#34d399' },
   dotR: { backgroundColor: '#f87171' },
 
   // Bottom
-  bot: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingTop: 20, overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modeRow: { flexDirection: 'row', justifyContent: 'center', gap: 28, marginBottom: 18 },
-  modeT: { fontSize: 11, fontWeight: '600', letterSpacing: 1.5, color: 'rgba(255,255,255,0.3)' },
-  modeA: { color: '#fff' },
+  bot: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingTop: 24, overflow: 'hidden', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   botRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 36 },
   sideBtn: { width: 44, height: 44, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
   thumbPh: { width: 36, height: 36, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)' },
   plus: { fontSize: 20, color: 'rgba(255,255,255,0.7)' },
   shOuter: { width: 76, height: 76, borderRadius: 38, borderWidth: 3.5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: RED },
-  shRec: { borderRadius: 8, width: 30, height: 30, backgroundColor: RED },
 
   // Error
   toast: { position: 'absolute', top: 100, left: 24, right: 24, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 12, padding: 12 },
   toastT: { color: '#fff', fontSize: 13, textAlign: 'center', fontWeight: '500' },
-  errFloat: { color: '#f87171', fontSize: 13, textAlign: 'center', position: 'absolute', bottom: 140, left: 24, right: 24 },
+  errFloat: { color: '#f87171', fontSize: 13, textAlign: 'center', position: 'absolute', bottom: 100, left: 24, right: 24 },
 
   // Preview
   prevImg: { flex: 1, resizeMode: 'contain' } as const,
+  prevTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24 },
+  prevAction: { color: '#fff', fontSize: 16, fontWeight: '500' },
+  prevBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 16 },
   fName: { fontSize: 18, fontWeight: '500', color: '#fff', marginBottom: 8 },
   muted: { fontSize: 12, color: 'rgba(255,255,255,0.35)' },
-  prevBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingTop: 16 },
 
   // Upload
   ring: { width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
@@ -444,7 +414,7 @@ const st = StyleSheet.create({
   // Gallery
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingBottom: 8 },
   back: { fontSize: 24, color: '#fff' },
-  headerTitle: { fontSize: 15, fontWeight: '600', color: '#fff', letterSpacing: 0.5 },
+  headerT: { fontSize: 15, fontWeight: '600', color: '#fff', letterSpacing: 0.5 },
   gRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)' },
   gIcon: { width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   gIconT: { fontSize: 16, color: 'rgba(255,255,255,0.4)' },
