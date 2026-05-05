@@ -1,6 +1,6 @@
 # VibeCam Project Context
 
-Last updated: 2026-04-27
+Last updated: 2026-05-05
 
 ## Current State
 
@@ -35,6 +35,7 @@ Last updated: 2026-04-27
 - EAS build config is in mobile/eas.json
 - Render blueprint is defined in render.yaml
 - GitHub Pages content lives under docs/site
+- GitHub Pages deployment workflow (.github/workflows/pages.yml) deploys docs/site on push to main/mvp or manual dispatch
 
 ## Verified Working
 
@@ -61,8 +62,9 @@ Last updated: 2026-04-27
 ## Suggested Next Implementation Steps
 
 1. Deploy backend via render.yaml and validate production URL.
-2. Publish docs/site via GitHub Pages.
-3. Add cloud storage integration for upload artifacts.
+2. Enable GitHub Pages in repo settings (source: GitHub Actions) to publish docs/site.
+3. Build and submit to app stores using EAS and the metadata in docs/STORE_METADATA.md.
+4. Add cloud storage integration for upload artifacts (post-MVP).
 
 ## Quick Validation Commands
 
