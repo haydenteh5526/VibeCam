@@ -119,13 +119,16 @@ app = FastAPI(title="VibeCam API", version="0.1.0")
 
 local_origins = [
     "http://localhost",
+    "http://localhost:8081",
     "http://localhost:19006",
     "http://localhost:3000",
     "http://127.0.0.1",
+    "http://127.0.0.1:8081",
     "http://127.0.0.1:19006",
     "http://127.0.0.1:3000",
     "http://10.0.2.2",
     "http://10.0.2.2:8000",
+    "https://vibecam-backend.onrender.com",
 ]
 
 app.add_middleware(
