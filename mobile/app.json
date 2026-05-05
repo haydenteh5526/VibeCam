@@ -43,6 +43,9 @@
         "projectId": "054f74da-a7ed-4340-84cb-eb5f257ae716"
       }
     },
-    "owner": "hayyyyy"
+    "owner": "hayyyyy",
+    "plugins": [
+      "expo-video"
+    ]
   }
 }
