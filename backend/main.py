@@ -343,6 +343,49 @@ def initialize_upload(payload: UploadInitRequest) -> UploadInitResponse:
     )
 
 
+class UploadListItem(BaseModel):
+    upload_id: str
+    file_name: str
+    mime_type: str
+    status: Literal["initialized", "partial", "ingested"]
+    size_bytes: int
+    bytes_received: int
+    ingested_at_utc: str | None = None
+
+
+@app.get("/uploads", response_model=list[UploadListItem], tags=["uploads"])
+def list_uploads(
+    status_filter: str | None = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[UploadListItem]:
+    with _get_connection() as connection:
+        if status_filter:
+            rows = connection.execute(
+                "SELECT * FROM upload_sessions WHERE status = ? ORDER BY rowid DESC LIMIT ?",
+                (status_filter, limit),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                "SELECT * FROM upload_sessions ORDER BY rowid DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
+    items: list[UploadListItem] = []
+    for row in rows:
+        items.append(
+            UploadListItem(
+                upload_id=row["upload_id"],
+                file_name=row["file_name"],
+                mime_type=row["mime_type"],
+                status=row["status"],
+                size_bytes=row["size_bytes"],
+                bytes_received=row["bytes_received"],
+                ingested_at_utc=row["ingested_at_utc"],
+            )
+        )
+    return items
+
+
 @app.get("/uploads/{upload_id}", response_model=UploadStatusResponse, tags=["uploads"])
 def get_upload_status(upload_id: str) -> UploadStatusResponse:
     upload_session = _get_upload_session(upload_id)
