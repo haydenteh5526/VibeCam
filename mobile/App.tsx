@@ -12,7 +12,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
-import { Camera, useCameraDevice, useCameraPermission, type CameraRef } from 'react-native-vision-camera';
+import { CameraView, CameraType, FlashMode, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -69,17 +69,15 @@ const fmtBytes = (b: number): string => {
 
 function VibeCam() {
   const insets = useSafeAreaInsets();
-  const { hasPermission, requestPermission } = useCameraPermission();
-  const backDevice = useCameraDevice('back');
-  const frontDevice = useCameraDevice('front');
-  const cameraRef = useRef<CameraRef>(null);
+  const [camPerm, requestCamPerm] = useCameraPermissions();
+  const [micPerm, requestMicPerm] = useMicrophonePermissions();
 
   const [screen, setScreen] = useState<AppScreen>('loading');
   const [backendReady, setBackendReady] = useState(false);
-  const [facing, setFacing] = useState<'back' | 'front'>('back');
-  const [flash, setFlash] = useState(false);
+  const [facing, setFacing] = useState<CameraType>('back');
+  const [flash, setFlash] = useState<FlashMode>('off');
   const [mode, setMode] = useState<CaptureMode>('photo');
-  const [cameraActive, setCameraActive] = useState(true);
+  const [cameraReady, setCameraReady] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [lastThumb, setLastThumb] = useState<string | null>(null);
@@ -90,7 +88,7 @@ function VibeCam() {
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [vibeApplied, setVibeApplied] = useState(false);
 
-  const device = facing === 'back' ? backDevice : frontDevice;
+  const cameraRef = useRef<CameraView>(null);
 
   // Animations
   const shutterScale = useSharedValue(1);
@@ -103,7 +101,6 @@ function VibeCam() {
   // Init
   useEffect(() => {
     fetch(`${API_BASE_URL}/health`).then((r) => { if (r.ok) setBackendReady(true); }).catch(() => {});
-    // Simulate camera warm-up
     const t = setTimeout(() => { setScreen('camera'); fadeIn.value = withTiming(1, { duration: 600 }); }, 1200);
     return () => clearTimeout(t);
   }, [fadeIn]);
@@ -127,57 +124,52 @@ function VibeCam() {
 
   const toggleFlash = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFlash((f) => !f);
+    setFlash((f) => (f === 'off' ? 'on' : 'off'));
   }, []);
 
   const onPressIn = useCallback(() => { shutterScale.value = withSpring(0.85, { damping: 15, stiffness: 300 }); }, [shutterScale]);
   const onPressOut = useCallback(() => { shutterScale.value = withSpring(1, { damping: 12, stiffness: 200 }); }, [shutterScale]);
 
   const takePhoto = useCallback(async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !cameraReady) return;
     try {
-      const snapshot = await cameraRef.current.takeSnapshot();
-      const path = await snapshot.saveToTemporaryFileAsync('jpg', 92);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const uri = path.startsWith('file://') ? path : `file://${path}`;
-      setCapturedImage(uri);
-      setLastThumb(uri);
-      const f = new File(uri);
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
+      if (!photo?.uri) throw new Error('Capture failed');
+      const f = new File(photo.uri);
       const info = f.info();
-      setSelectedFile({ uri, name: `photo-${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: info.exists && typeof info.size === 'number' ? info.size : null });
-      setCameraActive(false);
+      setCapturedImage(photo.uri);
+      setLastThumb(photo.uri);
+      setSelectedFile({ uri: photo.uri, name: `photo-${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: info.exists && typeof info.size === 'number' ? info.size : null });
       setScreen('preview');
     } catch (e) { setError(e instanceof Error ? e.message : 'Capture failed'); }
-  }, []);
+  }, [cameraReady]);
 
   const startRecording = useCallback(async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !cameraReady) return;
+    if (!micPerm?.granted) { const r = await requestMicPerm(); if (!r.granted) { setError('Microphone required'); return; } }
     setIsRecording(true);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    // Vision camera v5 recording would go here — for now capture a snapshot as fallback
-    // In production, use useVideoOutput + startRecording on the output
-  }, []);
-
-  const stopRecording = useCallback(async () => {
-    setIsRecording(false);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Fallback: take a snapshot to simulate end of recording
-    if (cameraRef.current) {
-      const snapshot = await cameraRef.current.takeSnapshot();
-      const path = await snapshot.saveToTemporaryFileAsync('jpg', 92);
-      const uri = path.startsWith('file://') ? path : `file://${path}`;
-      setCapturedImage(uri);
-      setLastThumb(uri);
-      const f = new File(uri);
+    try {
+      const video = await cameraRef.current.recordAsync({ maxDuration: 30 });
+      if (!video?.uri) throw new Error('Recording failed');
+      const f = new File(video.uri);
       const info = f.info();
-      setSelectedFile({ uri, name: `video-${Date.now()}.mp4`, mimeType: 'video/mp4', sizeBytes: info.exists && typeof info.size === 'number' ? info.size : null });
-      setCameraActive(false);
+      setCapturedImage(null);
+      setLastThumb(null);
+      setSelectedFile({ uri: video.uri, name: `video-${Date.now()}.mp4`, mimeType: 'video/mp4', sizeBytes: info.exists && typeof info.size === 'number' ? info.size : null });
       setScreen('preview');
-    }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Recording failed'); }
+    finally { setIsRecording(false); }
+  }, [cameraReady, micPerm, requestMicPerm]);
+
+  const stopRecording = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    cameraRef.current?.stopRecording();
   }, []);
 
   const onShutter = useCallback(() => {
-    if (mode === 'photo') { takePhoto(); }
+    if (mode === 'photo') takePhoto();
     else { if (isRecording) stopRecording(); else startRecording(); }
   }, [mode, isRecording, takePhoto, startRecording, stopRecording]);
 
@@ -186,20 +178,15 @@ function VibeCam() {
       const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false, type: '*/*' });
       if (result.canceled) return;
       const file = result.assets[0];
-      const uri = file.uri;
       const isImg = file.mimeType?.startsWith('image/');
-      setCapturedImage(isImg ? uri : null);
-      if (isImg) setLastThumb(uri);
-      setSelectedFile({ uri, name: file.name || 'file.bin', mimeType: (file.mimeType || 'application/octet-stream').toLowerCase(), sizeBytes: file.size ?? null });
-      setCameraActive(false);
+      setCapturedImage(isImg ? file.uri : null);
+      if (isImg) setLastThumb(file.uri);
+      setSelectedFile({ uri: file.uri, name: file.name || 'file.bin', mimeType: (file.mimeType || 'application/octet-stream').toLowerCase(), sizeBytes: file.size ?? null });
       setScreen('preview');
     } catch (e) { setError(e instanceof Error ? e.message : 'File selection failed'); }
   }, []);
 
-  const applyVibe = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setVibeApplied((v) => !v);
-  }, []);
+  const applyVibe = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setVibeApplied((v) => !v); }, []);
 
   // ─── Upload ──────────────────────────────────────────────────────────────
 
@@ -244,13 +231,12 @@ function VibeCam() {
   }, []);
 
   const reset = useCallback(() => {
-    setCapturedImage(null); setSelectedFile(null); setUploadProgress(0); setPayloadHash(null); setError(''); setVibeApplied(false); setCameraActive(true); setScreen('camera');
+    setCapturedImage(null); setSelectedFile(null); setUploadProgress(0); setPayloadHash(null); setError(''); setVibeApplied(false); setScreen('camera');
   }, []);
 
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
-  // Loading / splash
   if (screen === 'loading') {
     return (
       <View style={st.splash}><StatusBar style="light" />
@@ -261,25 +247,16 @@ function VibeCam() {
     );
   }
 
-  // Permission
-  if (!hasPermission) {
+  if (!camPerm?.granted) {
     return (
       <View style={st.splash}><StatusBar style="light" />
         <Text style={st.splashMark}>V</Text>
         <Text style={st.permBody}>Camera access is needed{'\n'}to capture moments.</Text>
-        <Pressable style={st.pill} onPress={requestPermission}>
-          <Text style={st.pillT}>Grant Camera Access</Text>
-        </Pressable>
+        <Pressable style={st.pill} onPress={requestCamPerm}><Text style={st.pillT}>Grant Camera Access</Text></Pressable>
       </View>
     );
   }
 
-  // No device
-  if (!device) {
-    return <View style={st.splash}><StatusBar style="light" /><Text style={st.muted}>No camera available</Text></View>;
-  }
-
-  // Gallery
   if (screen === 'gallery') {
     return (
       <View style={st.dark}><StatusBar style="light" />
@@ -305,7 +282,6 @@ function VibeCam() {
     );
   }
 
-  // Done
   if (screen === 'done') {
     return (
       <View style={st.dark}><StatusBar style="light" />
@@ -322,7 +298,6 @@ function VibeCam() {
     );
   }
 
-  // Uploading
   if (screen === 'uploading') {
     return (
       <View style={st.dark}><StatusBar style="light" />
@@ -335,7 +310,6 @@ function VibeCam() {
     );
   }
 
-  // Preview
   if (screen === 'preview' && selectedFile) {
     const isImg = selectedFile.mimeType.startsWith('image/');
     return (
@@ -345,22 +319,13 @@ function VibeCam() {
         ) : isImg ? (
           <Image source={{ uri: selectedFile.uri }} style={[st.prevImg, vibeApplied && st.vibeFilter]} />
         ) : (
-          <View style={st.center}>
-            <Text style={st.fileName}>{selectedFile.name}</Text>
-            <Text style={st.muted}>{selectedFile.sizeBytes ? fmtBytes(selectedFile.sizeBytes) : ''} · {selectedFile.mimeType}</Text>
-          </View>
+          <View style={st.center}><Text style={st.fileName}>{selectedFile.name}</Text><Text style={st.muted}>{selectedFile.sizeBytes ? fmtBytes(selectedFile.sizeBytes) : ''} · {selectedFile.mimeType}</Text></View>
         )}
         {error.length > 0 && <View style={st.errBanner}><Text style={st.errBannerT}>{error}</Text></View>}
-
-        {/* Top actions */}
         <View style={[st.prevTop, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={reset} hitSlop={12}><Text style={st.prevAct}>Retake</Text></Pressable>
-          <Pressable onPress={applyVibe} hitSlop={12}>
-            <Text style={[st.prevAct, vibeApplied && st.vibeActive]}>Apply Vibe</Text>
-          </Pressable>
+          <Pressable onPress={applyVibe} hitSlop={12}><Text style={[st.prevAct, vibeApplied && st.vibeActive]}>Apply Vibe</Text></Pressable>
         </View>
-
-        {/* Bottom upload */}
         <View style={[st.prevBot, { paddingBottom: insets.bottom + 16 }]}>
           <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
           <Pressable style={[st.uploadBtn, !backendReady && st.dis]} disabled={!backendReady} onPress={uploadFile}>
@@ -375,18 +340,21 @@ function VibeCam() {
   // Camera
   return (
     <Animated.View style={[st.cam, fadeStyle]}><StatusBar style="light" />
-      <Camera
+      <CameraView
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
-        device={device}
-        isActive={cameraActive}
-        torchMode={flash && facing === 'back' ? 'on' : 'off'}
+        facing={facing}
+        flash={flash}
+        mode={mode === 'video' ? 'video' : 'picture'}
+        videoQuality="720p"
+        onCameraReady={() => setCameraReady(true)}
+        onMountError={(e) => setError(e.message)}
       />
 
-      {/* Top bar */}
+      {/* Top */}
       <View style={[st.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={toggleFlash} style={st.topBtn} hitSlop={12}>
-          <View style={[st.flashIcon, flash && st.flashOn]} />
+          <View style={[st.flashIcon, flash === 'on' && st.flashOn]} />
         </Pressable>
         <View style={[st.connDot, backendReady ? st.dotG : st.dotR]} />
         <Pressable onPress={toggleFacing} style={st.topBtn} hitSlop={12}>
@@ -394,7 +362,6 @@ function VibeCam() {
         </Pressable>
       </View>
 
-      {/* Recording indicator */}
       {isRecording && (
         <Animated.View style={[st.recBadge, recStyle, { top: insets.top + 56 }]}>
           <View style={st.recDot} /><Text style={st.recText}>REC</Text>
@@ -406,8 +373,6 @@ function VibeCam() {
       {/* Bottom */}
       <View style={[st.bot, { paddingBottom: insets.bottom + 16 }]}>
         <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-
-        {/* Mode toggle */}
         <View style={st.modeRow}>
           <Pressable onPress={() => { if (!isRecording) setMode('photo'); }} hitSlop={8}>
             <Text style={[st.modeT, mode === 'photo' && st.modeA]}>PHOTO</Text>
@@ -416,28 +381,16 @@ function VibeCam() {
             <Text style={[st.modeT, mode === 'video' && st.modeA]}>VIDEO</Text>
           </Pressable>
         </View>
-
         <View style={st.botRow}>
-          {/* Gallery thumb */}
           <Pressable onPress={openGallery} style={st.thumbWrap}>
-            {lastThumb ? (
-              <Image source={{ uri: lastThumb }} style={st.thumbImg} />
-            ) : (
-              <View style={st.thumbEmpty} />
-            )}
+            {lastThumb ? <Image source={{ uri: lastThumb }} style={st.thumbImg} /> : <View style={st.thumbEmpty} />}
           </Pressable>
-
-          {/* Shutter */}
-          <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut}>
+          <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!cameraReady}>
             <Animated.View style={[st.shOuter, shutterStyle]}>
               <View style={[st.shInner, mode === 'video' && isRecording && st.shRec]} />
             </Animated.View>
           </Pressable>
-
-          {/* File picker */}
-          <Pressable onPress={pickFile} style={st.thumbWrap}>
-            <Text style={st.plusIcon}>＋</Text>
-          </Pressable>
+          <Pressable onPress={pickFile} style={st.thumbWrap}><Text style={st.plusIcon}>＋</Text></Pressable>
         </View>
       </View>
     </Animated.View>
@@ -456,7 +409,7 @@ const st = StyleSheet.create({
   dark: { flex: 1, backgroundColor: '#0a0a0a' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
 
-  // Splash / loading
+  // Splash
   splash: { flex: 1, backgroundColor: '#0a0a0a', alignItems: 'center', justifyContent: 'center', padding: 32 },
   splashMark: { fontSize: 56, fontWeight: '100', color: '#fff', letterSpacing: -2 },
   splashName: { fontSize: 11, fontWeight: '600', letterSpacing: 4, color: 'rgba(255,255,255,0.4)', marginTop: 8 },
@@ -464,7 +417,7 @@ const st = StyleSheet.create({
   pill: { backgroundColor: '#fff', paddingVertical: 14, paddingHorizontal: 36, borderRadius: 999 },
   pillT: { color: '#0a0a0a', fontSize: 15, fontWeight: '600' },
 
-  // Top bar
+  // Top
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20 },
   topBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   flashIcon: { width: 4, height: 14, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 2 },
@@ -485,14 +438,10 @@ const st = StyleSheet.create({
   modeT: { fontSize: 11, fontWeight: '600', letterSpacing: 1.8, color: 'rgba(255,255,255,0.25)' },
   modeA: { color: '#fff' },
   botRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32 },
-
-  // Thumb / side buttons
   thumbWrap: { width: 46, height: 46, borderRadius: 12, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   thumbImg: { width: 46, height: 46, borderRadius: 12 },
   thumbEmpty: { width: 38, height: 38, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.04)' },
   plusIcon: { fontSize: 20, color: 'rgba(255,255,255,0.6)' },
-
-  // Shutter
   shOuter: { width: 76, height: 76, borderRadius: 38, borderWidth: 3.5, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   shInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: RED },
   shRec: { borderRadius: 8, width: 28, height: 28 },
@@ -503,7 +452,7 @@ const st = StyleSheet.create({
 
   // Preview
   prevImg: { flex: 1, resizeMode: 'contain' } as const,
-  vibeFilter: { opacity: 0.85, tintColor: undefined },
+  vibeFilter: { opacity: 0.85 },
   vibeActive: { color: RED },
   prevTop: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20 },
   prevAct: { color: '#fff', fontSize: 16, fontWeight: '500' },
@@ -515,7 +464,7 @@ const st = StyleSheet.create({
   fileName: { fontSize: 18, fontWeight: '500', color: '#fff', marginBottom: 8 },
   muted: { fontSize: 12, color: 'rgba(255,255,255,0.3)' },
 
-  // Upload progress
+  // Upload
   ring: { width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   ringPct: { fontSize: 30, fontWeight: '200', color: '#fff' },
   uploadLabel: { fontSize: 11, fontWeight: '500', letterSpacing: 2.5, color: 'rgba(255,255,255,0.25)', marginBottom: 24 },
