@@ -229,8 +229,8 @@ export default function App() {
 
       {/* Top floating pills */}
       <View style={s.topFloat}>
-        <Pressable onPress={toggleFlash} style={s.tPill}><Text style={s.tPillT}>{flash === 'on' ? '⚡' : '⚡\u0338'}</Text></Pressable>
-        <Pressable onPress={cycleTimer} style={s.tPill}><Text style={s.tPillT}>{timer > 0 ? `${timer}s` : '⏱'}</Text></Pressable>
+        <Pressable onPress={toggleFlash} style={[s.tPill, flash === 'on' && s.tPillActive]}><Text style={[s.tPillT, flash === 'on' && s.tPillTActive]}>Flash</Text></Pressable>
+        <Pressable onPress={cycleTimer} style={[s.tPill, timer > 0 && s.tPillActive]}><Text style={[s.tPillT, timer > 0 && s.tPillTActive]}>{timer > 0 ? `${timer}s` : 'Timer'}</Text></Pressable>
       </View>
 
       {/* Bottom control sheet */}
@@ -299,8 +299,10 @@ const s = StyleSheet.create({
 
   // Top floating
   topFloat: { position: 'absolute', top: 56, right: 20, flexDirection: 'row', gap: 8 },
-  tPill: { backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
-  tPillT: { color: '#fff', fontSize: 14 },
+  tPill: { backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
+  tPillActive: { backgroundColor: ACCENT },
+  tPillT: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
+  tPillTActive: { color: '#000' },
 
   // Bottom sheet
   sheet: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 36, gap: 16 },
