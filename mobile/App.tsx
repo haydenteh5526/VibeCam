@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
@@ -16,11 +16,10 @@ type SelectedFile = { uri: string; name: string; mimeType: string; sizeBytes: nu
 type CaptureMode = 'photo' | 'video';
 type AppScreen = 'camera' | 'preview' | 'uploading' | 'done' | 'gallery';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 const DEFAULT_API = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
 const API = (() => { const v = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.EXPO_PUBLIC_API_BASE_URL; return v && v.trim().length > 0 ? v.trim() : DEFAULT_API; })();
 const CHUNK = 256 * 1024;
-const ACCENT = '#F5A623'; // Bevel warm gold
 
 const resolveSize = async (f: SelectedFile): Promise<number> => {
   if (f.sizeBytes !== null) return f.sizeBytes;
@@ -75,9 +74,9 @@ export default function App() {
   const onPinchEnd = useCallback(() => { lastDist.current = null; }, []);
 
   const onTapFocus = useCallback((e: { nativeEvent: { locationX: number; locationY: number } }) => {
-    const { locationX: x, locationY: y } = e.nativeEvent;
-    setFocusXY({ x, y }); focusAnim.setValue(1);
-    Animated.timing(focusAnim, { toValue: 0, duration: 700, useNativeDriver: true }).start(() => setFocusXY(null));
+    setFocusXY({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY });
+    focusAnim.setValue(1);
+    Animated.timing(focusAnim, { toValue: 0, duration: 600, useNativeDriver: true }).start(() => setFocusXY(null));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [focusAnim]);
 
@@ -146,65 +145,55 @@ export default function App() {
   const reset = useCallback(() => { setCaptured(null); setFile(null); setProgress(0); setHash(null); setErr(''); setScreen('camera'); }, []);
 
 
-  // Permission
   if (!camPerm?.granted) return (
-    <View style={s.bg}><StatusBar style="light" /><View style={s.center}>
-      <View style={s.permIcon}><Text style={{ fontSize: 32 }}>📷</Text></View>
-      <Text style={s.permTitle}>Camera Access</Text>
-      <Text style={s.permSub}>VibeCam needs your camera to capture photos and videos.</Text>
-      <Pressable style={s.permBtn} onPress={requestCam}><Text style={s.permBtnT}>Continue</Text></Pressable>
+    <View style={c.bg}><StatusBar style="light" /><View style={c.mid}>
+      <Text style={c.permH}>Allow Camera</Text>
+      <Text style={c.permP}>VibeCam needs camera access to take photos and record video.</Text>
+      <Pressable style={c.permBtn} onPress={requestCam}><Text style={c.permBtnT}>Allow</Text></Pressable>
     </View></View>
   );
 
-  // Gallery
   if (screen === 'gallery') return (
-    <View style={s.bg}><StatusBar style="light" />
-      <View style={s.gHeader}><Pressable onPress={reset} style={s.gBack}><Text style={s.gBackT}>←</Text></Pressable><Text style={s.gTitle}>Library</Text><View style={{ width: 40 }} /></View>
-      {gallery.length === 0 ? <View style={s.center}><Text style={s.empty}>Your uploads will appear here</Text></View> : (
-        <FlatList data={gallery} numColumns={3} keyExtractor={i => i.upload_id} contentContainerStyle={{ padding: 2 }} renderItem={({ item }) => (
-          <View style={s.gCell}><View style={s.gCellIn}>{item.mime_type.startsWith('video/') && <View style={s.gVidBadge}><Text style={s.gVidT}>▶</Text></View>}</View></View>
+    <View style={c.bg}><StatusBar style="light" />
+      <View style={c.navRow}><Pressable onPress={reset}><Text style={c.navL}>‹</Text></Pressable><Text style={c.navT}>Uploads</Text><View style={{ width: 28 }} /></View>
+      {gallery.length === 0 ? <View style={c.mid}><Text style={c.dim}>Nothing here yet</Text></View> : (
+        <FlatList data={gallery} numColumns={3} keyExtractor={i => i.upload_id} contentContainerStyle={{ padding: 1 }} renderItem={({ item }) => (
+          <View style={c.gCell}><View style={c.gInner}>{item.mime_type.startsWith('video/') && <Text style={c.gVid}>▶</Text>}</View></View>
         )} />
       )}
     </View>
   );
 
-  // Done
   if (screen === 'done') return (
-    <View style={s.bg}><StatusBar style="light" /><View style={s.center}>
-      <View style={s.doneRing}><Text style={s.doneIcon}>✓</Text></View>
-      <Text style={s.doneTitle}>Uploaded</Text>
-      <Text style={s.doneSub}>Your file is safely stored</Text>
-      {hash && <Text style={s.doneHash}>{hash.slice(0, 16)}</Text>}
-      <View style={s.doneRow}>
-        <Pressable style={s.doneBtnO} onPress={openGallery}><Text style={s.doneBtnOT}>Library</Text></Pressable>
-        <Pressable style={s.doneBtnS} onPress={reset}><Text style={s.doneBtnST}>New</Text></Pressable>
+    <View style={c.bg}><StatusBar style="light" /><View style={c.mid}>
+      <View style={c.okCircle}><Text style={c.okMark}>✓</Text></View>
+      <Text style={c.okTitle}>Done</Text>
+      {hash && <Text style={c.okHash}>{hash.slice(0, 16)}</Text>}
+      <View style={c.okRow}>
+        <Pressable style={c.okBtn} onPress={openGallery}><Text style={c.okBtnT}>Uploads</Text></Pressable>
+        <Pressable style={c.okBtnW} onPress={reset}><Text style={c.okBtnWT}>New</Text></Pressable>
       </View>
     </View></View>
   );
 
-  // Uploading
   if (screen === 'uploading') return (
-    <View style={s.bg}><StatusBar style="light" /><View style={s.center}>
-      <View style={s.upRing}><Text style={s.upPct}>{Math.round(progress * 100)}</Text><Text style={s.upPctSign}>%</Text></View>
-      <View style={s.upBar}><View style={[s.upFill, { width: `${progress * 100}%` }]} /></View>
+    <View style={c.bg}><StatusBar style="light" /><View style={c.mid}>
+      <Text style={c.upNum}>{Math.round(progress * 100)}%</Text>
+      <View style={c.upBar}><View style={[c.upFill, { width: `${progress * 100}%` }]} /></View>
     </View></View>
   );
 
-  // Preview
   if (screen === 'preview' && file) {
     const isVid = file.mimeType.startsWith('video/');
     return (
-      <View style={s.bg}><StatusBar style="light" />
-        <View style={s.prevMedia}>
-          {isVid && captured ? <VidPreview uri={captured} /> : captured ? <Image source={{ uri: captured }} style={s.prevImg} resizeMode="cover" /> : <View style={s.center}><Text style={s.prevName}>{file.name}</Text><Text style={s.muted}>{file.sizeBytes ? fmt(file.sizeBytes) : ''}</Text></View>}
-        </View>
-        {/* Actions */}
-        <View style={s.prevActions}>
-          <Pressable onPress={reset} style={s.prevPill}><Text style={s.prevPillT}>✕</Text></Pressable>
-          <View style={s.prevRow}>
-            <Pressable onPress={saveToRoll} style={s.prevAct}><Text style={s.prevActI}>↓</Text></Pressable>
-            <Pressable onPress={share} style={s.prevAct}><Text style={s.prevActI}>↗</Text></Pressable>
-            <Pressable onPress={upload} style={[s.prevActUp, !backend && s.dis]} disabled={!backend}><Text style={s.prevActUpT}>Upload</Text></Pressable>
+      <View style={c.bg}><StatusBar style="light" />
+        {isVid && captured ? <VidPrev uri={captured} /> : captured ? <Image source={{ uri: captured }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
+        <View style={c.pTop}><Pressable onPress={reset} style={c.pClose}><Text style={c.pCloseT}>✕</Text></Pressable></View>
+        <View style={c.pBot}>
+          <View style={c.pRow}>
+            <Pressable onPress={saveToRoll} style={c.pAct}><Text style={c.pActT}>Save</Text></Pressable>
+            <Pressable onPress={share} style={c.pAct}><Text style={c.pActT}>Share</Text></Pressable>
+            <Pressable onPress={upload} style={[c.pUp, !backend && c.dis]} disabled={!backend}><Text style={c.pUpT}>Upload</Text></Pressable>
           </View>
         </View>
       </View>
@@ -212,163 +201,179 @@ export default function App() {
   }
 
 
-  // Camera - Bevel style
+  // ─── Camera ──────────────────────────────────────────────────────────────
   return (
-    <View style={s.bg}><StatusBar style="light" />
-      {/* Viewfinder with rounded corners */}
-      <Pressable style={s.vf} onPress={onTapFocus} onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })} onTouchEnd={onPinchEnd}>
-        <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} flash={flash} zoom={zoom} mode={mode === 'video' ? 'video' : 'picture'} videoQuality="720p" onCameraReady={() => setReady(true)} onMountError={e => setErr(e.message)} />
-        {focusXY && <Animated.View style={[s.focus, { left: focusXY.x - 30, top: focusXY.y - 30, opacity: focusAnim }]} />}
-        {/* Zoom pill */}
-        {zoom > 0.01 && <View style={s.zPill}><Text style={s.zPillT}>{(1 + zoom * 7).toFixed(1)}×</Text></View>}
-        {/* Rec indicator */}
-        {recording && <View style={s.recBadge}><View style={s.recDot} /><Text style={s.recTime}>{String(Math.floor(recSec / 60)).padStart(2, '0')}:{String(recSec % 60).padStart(2, '0')}</Text></View>}
+    <View style={c.bg}><StatusBar style="light" />
+      {/* Viewfinder — full width, takes all space above bottom bar */}
+      <Pressable style={c.vf} onPress={onTapFocus}
+        onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })}
+        onTouchEnd={onPinchEnd}>
+        <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} flash={flash} zoom={zoom}
+          mode={mode === 'video' ? 'video' : 'picture'} videoQuality="720p"
+          onCameraReady={() => setReady(true)} onMountError={e => setErr(e.message)} />
+
+        {/* Focus indicator */}
+        {focusXY && <Animated.View style={[c.focus, { left: focusXY.x - 32, top: focusXY.y - 32, opacity: focusAnim, transform: [{ scale: focusAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]} />}
+
+        {/* Zoom indicator */}
+        {zoom > 0.01 && <View style={c.zBadge}><Text style={c.zT}>{(1 + zoom * 7).toFixed(1)}×</Text></View>}
+
+        {/* Recording indicator */}
+        {recording && <View style={c.recPill}><View style={c.recDot} /><Text style={c.recT}>{String(Math.floor(recSec / 60)).padStart(2, '0')}:{String(recSec % 60).padStart(2, '0')}</Text></View>}
+
         {/* Countdown */}
-        {countdown !== null && <View style={s.countOver}><Text style={s.countNum}>{countdown}</Text></View>}
+        {countdown !== null && <View style={c.countBg}><Text style={c.countN}>{countdown}</Text></View>}
       </Pressable>
 
-      {/* Top floating pills */}
-      <View style={s.topFloat}>
-        <Pressable onPress={toggleFlash} style={[s.tPill, flash === 'on' && s.tPillActive]}><Text style={[s.tPillT, flash === 'on' && s.tPillTActive]}>Flash</Text></Pressable>
-        <Pressable onPress={cycleTimer} style={[s.tPill, timer > 0 && s.tPillActive]}><Text style={[s.tPillT, timer > 0 && s.tPillTActive]}>{timer > 0 ? `${timer}s` : 'Timer'}</Text></Pressable>
+      {/* Top bar — inside safe area, over viewfinder */}
+      <View style={c.topBar}>
+        <Pressable onPress={toggleFlash} style={c.topI}>
+          <View style={[c.flashDot, flash === 'on' && c.flashOn]} />
+        </Pressable>
+        <Pressable onPress={cycleTimer} style={c.topI}>
+          <Text style={[c.topTxt, timer > 0 && c.topTxtOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text>
+        </Pressable>
+        <Pressable onPress={flip} style={c.topI}>
+          <View style={c.flipCircle}><View style={c.flipArrow} /></View>
+        </Pressable>
       </View>
 
-      {/* Bottom control sheet */}
-      <View style={s.sheet}>
+      {/* Bottom bar */}
+      <View style={c.bot}>
         {/* Mode selector */}
-        <View style={s.modeBar}>
-          <Pressable onPress={() => !recording && setMode('photo')} style={[s.modePill, mode === 'photo' && s.modePillA]}><Text style={[s.modePillT, mode === 'photo' && s.modePillTA]}>Photo</Text></Pressable>
-          <Pressable onPress={() => !recording && setMode('video')} style={[s.modePill, mode === 'video' && s.modePillA]}><Text style={[s.modePillT, mode === 'video' && s.modePillTA]}>Video</Text></Pressable>
+        <View style={c.modes}>
+          <Pressable onPress={() => !recording && setMode('photo')}>
+            <Text style={[c.modeT, mode === 'photo' && c.modeTOn]}>PHOTO</Text>
+          </Pressable>
+          <Pressable onPress={() => !recording && setMode('video')}>
+            <Text style={[c.modeT, mode === 'video' && c.modeTOn]}>VIDEO</Text>
+          </Pressable>
         </View>
 
-        {/* Controls */}
-        <View style={s.ctrlRow}>
-          {/* Gallery */}
-          <Pressable onPress={openGallery} style={s.thumbWrap}>
-            {lastThumb ? <Image source={{ uri: lastThumb }} style={s.thumbImg} /> : <View style={s.thumbPh} />}
+        {/* Shutter row */}
+        <View style={c.shutterRow}>
+          {/* Thumbnail */}
+          <Pressable onPress={lastThumb ? openGallery : pickFile} style={c.thumb}>
+            {lastThumb ? <Image source={{ uri: lastThumb }} style={c.thumbImg} /> : <View style={c.thumbPh} />}
           </Pressable>
 
-          {/* Shutter */}
+          {/* Shutter button */}
           <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready}>
-            <Animated.View style={[s.shOuter, { transform: [{ scale: shutterAnim }] }, mode === 'video' && recording && s.shOuterRec]}>
-              <View style={[s.shInner, mode === 'video' && recording && s.shInnerRec]} />
+            <Animated.View style={[c.shOuter, { transform: [{ scale: shutterAnim }] }, recording && c.shOuterRec]}>
+              <View style={[c.shInner, recording && c.shInnerRec]} />
             </Animated.View>
           </Pressable>
 
-          {/* Flip */}
-          <Pressable onPress={flip} style={s.flipWrap}><Text style={s.flipI}>⟲</Text></Pressable>
+          {/* Flip button */}
+          <Pressable onPress={flip} style={c.botFlip}>
+            <View style={c.botFlipInner} />
+          </Pressable>
         </View>
-
-        {/* File picker hint */}
-        <Pressable onPress={pickFile} style={s.importBtn}><Text style={s.importT}>Import File</Text></Pressable>
       </View>
 
-      {err.length > 0 && <View style={s.toast}><Text style={s.toastT}>{err}</Text></View>}
+      {err.length > 0 && <View style={c.toast}><Text style={c.toastT}>{err}</Text></View>}
     </View>
   );
 }
 
-function VidPreview({ uri }: { uri: string }) {
+function VidPrev({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, p => { p.loop = true; p.play(); });
   return <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} />;
 }
 
 
-const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#0C0C0C' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  muted: { fontSize: 13, color: 'rgba(255,255,255,0.35)' },
+const c = StyleSheet.create({
+  bg: { flex: 1, backgroundColor: '#000' },
+  mid: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  dim: { color: 'rgba(255,255,255,0.35)', fontSize: 15 },
 
   // Permission
-  permIcon: { width: 64, height: 64, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  permTitle: { fontSize: 22, fontWeight: '600', color: '#fff', marginBottom: 8 },
-  permSub: { fontSize: 15, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 21, marginBottom: 32 },
-  permBtn: { backgroundColor: ACCENT, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 14 },
-  permBtnT: { color: '#000', fontSize: 16, fontWeight: '700' },
+  permH: { color: '#fff', fontSize: 20, fontWeight: '600', marginBottom: 10 },
+  permP: { color: 'rgba(255,255,255,0.55)', fontSize: 15, textAlign: 'center', lineHeight: 21, marginBottom: 28 },
+  permBtn: { backgroundColor: '#fff', paddingVertical: 13, paddingHorizontal: 36, borderRadius: 24 },
+  permBtnT: { color: '#000', fontSize: 16, fontWeight: '600' },
 
   // Viewfinder
-  vf: { flex: 1, margin: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a' },
-  focus: { position: 'absolute', width: 60, height: 60, borderWidth: 1.5, borderColor: ACCENT, borderRadius: 4 },
-  zPill: { position: 'absolute', bottom: 16, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14 },
-  zPillT: { color: ACCENT, fontSize: 13, fontWeight: '700' },
-  recBadge: { position: 'absolute', top: 16, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, gap: 6 },
-  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF3B30' },
-  recTime: { color: '#FF3B30', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  countOver: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
-  countNum: { fontSize: 72, fontWeight: '200', color: '#fff' },
+  vf: { flex: 1 },
+  focus: { position: 'absolute', width: 64, height: 64, borderWidth: 1, borderColor: '#FFD60A', borderRadius: 1 },
+  zBadge: { position: 'absolute', bottom: 20, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  zT: { color: '#FFD60A', fontSize: 12, fontWeight: '700' },
+  recPill: { position: 'absolute', top: 12, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, gap: 6 },
+  recDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#FF3B30' },
+  recT: { color: '#FF3B30', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  countBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' },
+  countN: { fontSize: 72, fontWeight: '100', color: '#fff' },
 
-  // Top floating
-  topFloat: { position: 'absolute', top: 56, right: 20, flexDirection: 'row', gap: 8 },
-  tPill: { backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  tPillActive: { backgroundColor: ACCENT },
-  tPillT: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
-  tPillTActive: { color: '#000' },
+  // Top bar
+  topBar: { position: 'absolute', top: 52, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 28, alignItems: 'center' },
+  topI: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  flashDot: { width: 5, height: 16, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
+  flashOn: { backgroundColor: '#FFD60A' },
+  topTxt: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '600' },
+  topTxtOn: { color: '#FFD60A' },
+  flipCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)', alignItems: 'center', justifyContent: 'center' },
+  flipArrow: { width: 6, height: 6, borderTopWidth: 1.5, borderRightWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)', transform: [{ rotate: '45deg' }] },
 
-  // Bottom sheet
-  sheet: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 36, gap: 16 },
-  modeBar: { flexDirection: 'row', alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 3 },
-  modePill: { paddingVertical: 8, paddingHorizontal: 20, borderRadius: 10 },
-  modePillA: { backgroundColor: 'rgba(255,255,255,0.12)' },
-  modePillT: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.4)' },
-  modePillTA: { color: '#fff' },
-  ctrlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  thumbWrap: { width: 48, height: 48, borderRadius: 12, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)' },
+  // Bottom
+  bot: { backgroundColor: '#000', paddingTop: 10, paddingBottom: 34 },
+  modes: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginBottom: 18 },
+  modeT: { fontSize: 12, fontWeight: '600', letterSpacing: 1, color: 'rgba(255,255,255,0.35)' },
+  modeTOn: { color: '#FFD60A' },
+  shutterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 24 },
+
+  // Thumbnail
+  thumb: { width: 44, height: 44, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' },
   thumbImg: { width: '100%', height: '100%' },
-  thumbPh: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
-  shOuter: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
-  shOuterRec: { borderColor: '#FF3B30' },
-  shInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
-  shInnerRec: { width: 24, height: 24, borderRadius: 6, backgroundColor: '#FF3B30' },
-  flipWrap: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
-  flipI: { fontSize: 20, color: '#fff' },
-  importBtn: { alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16 },
-  importT: { fontSize: 13, color: 'rgba(255,255,255,0.35)', fontWeight: '500' },
+  thumbPh: { flex: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
+
+  // Shutter
+  shOuter: { width: 68, height: 68, borderRadius: 34, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  shOuterRec: { borderColor: 'rgba(255,255,255,0.3)' },
+  shInner: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#fff' },
+  shInnerRec: { width: 22, height: 22, borderRadius: 5, backgroundColor: '#FF3B30' },
+
+  // Bottom flip
+  botFlip: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  botFlipInner: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)' },
 
   // Toast
-  toast: { position: 'absolute', top: 60, left: 16, right: 16, backgroundColor: 'rgba(255,59,48,0.92)', borderRadius: 14, padding: 12 },
-  toastT: { color: '#fff', fontSize: 13, textAlign: 'center', fontWeight: '500' },
+  toast: { position: 'absolute', top: 100, left: 16, right: 16, backgroundColor: 'rgba(255,59,48,0.9)', borderRadius: 10, padding: 10 },
+  toastT: { color: '#fff', fontSize: 13, textAlign: 'center' },
 
   // Preview
-  prevMedia: { flex: 1, margin: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a' },
-  prevImg: { width: '100%', height: '100%' },
-  prevName: { fontSize: 17, fontWeight: '500', color: '#fff', marginBottom: 6 },
-  prevActions: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 36, gap: 16 },
-  prevPill: { position: 'absolute', top: 56, left: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  prevPillT: { color: '#fff', fontSize: 16 },
-  prevRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
-  prevAct: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
-  prevActI: { fontSize: 20, color: '#fff' },
-  prevActUp: { paddingVertical: 14, paddingHorizontal: 28, borderRadius: 14, backgroundColor: ACCENT },
-  prevActUpT: { color: '#000', fontSize: 15, fontWeight: '700' },
+  pTop: { position: 'absolute', top: 52, left: 16 },
+  pClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  pCloseT: { color: '#fff', fontSize: 15, fontWeight: '300' },
+  pBot: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingBottom: 40, paddingTop: 16, backgroundColor: 'rgba(0,0,0,0.5)' },
+  pRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
+  pAct: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)' },
+  pActT: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  pUp: { paddingVertical: 10, paddingHorizontal: 22, borderRadius: 20, backgroundColor: '#fff' },
+  pUpT: { color: '#000', fontSize: 14, fontWeight: '600' },
 
   // Upload
-  upRing: { width: 140, height: 140, borderRadius: 70, borderWidth: 3, borderColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center', marginBottom: 24, flexDirection: 'row' },
-  upPct: { fontSize: 40, fontWeight: '200', color: '#fff' },
-  upPctSign: { fontSize: 18, fontWeight: '300', color: 'rgba(255,255,255,0.4)', marginTop: 8 },
-  upBar: { width: '65%', height: 4, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' },
-  upFill: { height: '100%', backgroundColor: ACCENT, borderRadius: 2 },
+  upNum: { fontSize: 44, fontWeight: '200', color: '#fff', marginBottom: 16 },
+  upBar: { width: '60%', height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
+  upFill: { height: '100%', backgroundColor: '#fff' },
 
   // Done
-  doneRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: '#30d158', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  doneIcon: { fontSize: 30, color: '#30d158' },
-  doneTitle: { fontSize: 22, fontWeight: '600', color: '#fff', marginBottom: 4 },
-  doneSub: { fontSize: 14, color: 'rgba(255,255,255,0.4)', marginBottom: 8 },
-  doneHash: { fontSize: 12, color: 'rgba(255,255,255,0.2)', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 28 },
-  doneRow: { flexDirection: 'row', gap: 12 },
-  doneBtnO: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)' },
-  doneBtnOT: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  doneBtnS: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: '#fff' },
-  doneBtnST: { color: '#000', fontSize: 15, fontWeight: '600' },
+  okCircle: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#30D158', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  okMark: { fontSize: 28, color: '#30D158' },
+  okTitle: { fontSize: 20, fontWeight: '500', color: '#fff', marginBottom: 6 },
+  okHash: { fontSize: 11, color: 'rgba(255,255,255,0.25)', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 28 },
+  okRow: { flexDirection: 'row', gap: 12 },
+  okBtn: { paddingVertical: 11, paddingHorizontal: 22, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)' },
+  okBtnT: { color: '#fff', fontSize: 15, fontWeight: '500' },
+  okBtnW: { paddingVertical: 11, paddingHorizontal: 22, borderRadius: 12, backgroundColor: '#fff' },
+  okBtnWT: { color: '#000', fontSize: 15, fontWeight: '600' },
 
   // Gallery
-  gHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 56, paddingHorizontal: 20, paddingBottom: 12 },
-  gBack: { width: 40 }, gBackT: { fontSize: 22, color: '#fff' },
-  gTitle: { fontSize: 17, fontWeight: '600', color: '#fff' },
-  gCell: { width: (W - 8) / 3, aspectRatio: 1, padding: 2 },
-  gCellIn: { flex: 1, backgroundColor: '#1c1c1e', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  gVidBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  gVidT: { color: '#fff', fontSize: 12 },
-  empty: { fontSize: 15, color: 'rgba(255,255,255,0.3)' },
+  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 52, paddingHorizontal: 16, paddingBottom: 8 },
+  navL: { fontSize: 28, color: '#fff', fontWeight: '300' },
+  navT: { fontSize: 17, fontWeight: '600', color: '#fff' },
+  gCell: { width: W / 3, aspectRatio: 1, padding: 0.5 },
+  gInner: { flex: 1, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' },
+  gVid: { color: 'rgba(255,255,255,0.5)', fontSize: 14 },
 
   dis: { opacity: 0.35 },
 });
