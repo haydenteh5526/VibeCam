@@ -3,7 +3,7 @@ import { Animated, Dimensions, Image, PanResponder, Pressable, StyleSheet, Text,
 import * as Haptics from 'expo-haptics';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { DeviceMotion } from 'expo-sensors';
+import { DeviceMotion, LightSensor } from 'expo-sensors';
 import { CameraView, CameraType, FlashMode, useMicrophonePermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
@@ -62,6 +62,13 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   // Check storage on mount
   useEffect(() => {
     FileSystem.getFreeDiskStorageAsync().then(free => { if (free < 100 * 1024 * 1024) setStorageWarning(true); }).catch(() => {});
+  }, []);
+
+  // Low-light detection
+  useEffect(() => {
+    const sub = LightSensor.addListener(({ illuminance }) => { setLowLight(illuminance < 10); });
+    LightSensor.setUpdateInterval(1000);
+    return () => sub.remove();
   }, []);
 
   // ─── Controls ────────────────────────────────────────────────────────────
