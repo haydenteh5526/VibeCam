@@ -63,10 +63,15 @@ export default function App() {
     setCaptured(null); setFile(null); setProgress(0); setHash(null); setScreen('camera');
   }, []);
 
+  const onDelete = useCallback(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setCaptured(null); setFile(null); setScreen('camera');
+  }, []);
+
   if (!camPerm?.granted) return <PermissionScreen onAllow={requestCam} />;
   if (screen === 'gallery') return <GalleryScreen gallery={gallery} onBack={reset} />;
   if (screen === 'done') return <DoneScreen hash={hash} onGallery={onGallery} onNew={reset} />;
   if (screen === 'uploading') return <UploadingScreen progress={progress} />;
-  if (screen === 'preview' && file) return <PreviewScreen file={file} captured={captured} backendReady={backend} onClose={reset} onSave={onSave} onShare={onShare} onUpload={onUpload} />;
+  if (screen === 'preview' && file) return <PreviewScreen file={file} captured={captured} backendReady={backend} onClose={reset} onSave={onSave} onShare={onShare} onUpload={onUpload} onDelete={onDelete} />;
   return <CameraScreen onCapture={onCapture} onGallery={onGallery} lastThumb={lastThumb} />;
 }
