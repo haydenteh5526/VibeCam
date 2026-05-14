@@ -8,6 +8,7 @@ import { CameraView, CameraType, FlashMode, useMicrophonePermissions } from 'exp
 import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { FILTERS, type FilterId } from '../filters';
+import { pickBestFilter, getFilterName } from '../autoFilter';
 import { getRandomPose, type PoseSuggestion } from '../poses';
 import type { CaptureMode, SelectedFile } from '../types';
 
@@ -26,7 +27,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   const [timer, setTimer] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [focusXY, setFocusXY] = useState<{ x: number; y: number } | null>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterId>('original');
+  const [activeFilter, setActiveFilter] = useState<FilterId | 'auto'>('auto');
   const [showGrid, setShowGrid] = useState(false);
   const [recSec, setRecSec] = useState(0);
   const [flashAnimActive, setFlashAnimActive] = useState(false);
@@ -106,12 +107,16 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
     triggerFlash();
     const p = await cam.current.takePictureAsync({ quality: 0.92 });
     if (!p?.uri) return;
+    // Resolve filter: auto picks best, manual uses selected
+    const resolvedFilter: FilterId = activeFilter === 'auto'
+      ? pickBestFilter({ brightness: lowLight ? 'low' : 'normal', hasPortrait: faceDetected })
+      : activeFilter;
     // Auto-save to camera roll
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status === 'granted') await MediaLibrary.saveToLibraryAsync(p.uri);
     const fi = new File(p.uri).info();
-    onCapture({ uri: p.uri, name: `IMG_${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: fi.exists && typeof fi.size === 'number' ? fi.size : null }, p.uri, activeFilter);
-  }, [ready, onCapture, triggerFlash, activeFilter]);
+    onCapture({ uri: p.uri, name: `IMG_${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: fi.exists && typeof fi.size === 'number' ? fi.size : null }, p.uri, resolvedFilter);
+  }, [ready, onCapture, triggerFlash, activeFilter, lowLight, faceDetected]);
 
   const captureWithTimer = useCallback(() => { if (timer === 0) { doCapture(); return; } setCountdown(timer); let t = timer; const iv = setInterval(() => { t--; if (t <= 0) { clearInterval(iv); setCountdown(null); doCapture(); } else setCountdown(t); }, 1000); }, [timer, doCapture]);
 
@@ -122,8 +127,9 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
     try { const v = await cam.current.recordAsync({ maxDuration: 60 }); if (!v?.uri) throw new Error('Failed');
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status === 'granted') await MediaLibrary.saveToLibraryAsync(v.uri);
+      const resolvedVidFilter: FilterId = activeFilter === 'auto' ? pickBestFilter({ brightness: lowLight ? 'low' : 'normal', hasPortrait: faceDetected }) : activeFilter;
       const fi = new File(v.uri).info();
-      onCapture({ uri: v.uri, name: `VID_${Date.now()}.mp4`, mimeType: 'video/mp4', sizeBytes: fi.exists && typeof fi.size === 'number' ? fi.size : null }, v.uri, activeFilter);
+      onCapture({ uri: v.uri, name: `VID_${Date.now()}.mp4`, mimeType: 'video/mp4', sizeBytes: fi.exists && typeof fi.size === 'number' ? fi.size : null }, v.uri, resolvedVidFilter);
     } catch (e) { setErr(e instanceof Error ? e.message : 'Failed'); } finally { setRecording(false); }
   }, [ready, micPerm, requestMic, onCapture, activeFilter]);
 
@@ -132,7 +138,8 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
   const modePan = useRef(PanResponder.create({ onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dy) < 20, onPanResponderRelease: (_, g) => { if (recording) return; if (g.dx < -40) setMode('video'); else if (g.dx > 40) setMode('photo'); } })).current;
 
-  const currentFilter = FILTERS.find(f => f.id === activeFilter)!;
+  const resolvedFilterId: FilterId = activeFilter === 'auto' ? pickBestFilter({ brightness: lowLight ? 'low' : 'normal', hasPortrait: faceDetected }) : activeFilter;
+  const currentFilter = FILTERS.find(f => f.id === resolvedFilterId)!;
 
 
   return (
@@ -177,7 +184,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           {angleHint && <View style={st.angleHint}><Text style={st.angleHintT}>{angleHint}</Text></View>}
 
           {/* Active filter name */}
-          {activeFilter !== 'original' && <View style={st.filterLabel}><Text style={st.filterLabelT}>{currentFilter.name}</Text></View>}
+          {resolvedFilterId !== 'original' && <View style={st.filterLabel}><Text style={st.filterLabelT}>{activeFilter === 'auto' ? `✦ ${currentFilter.name}` : currentFilter.name}</Text></View>}
         </Pressable>
       </View>
 
@@ -199,7 +206,12 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
       {/* Filter strip — PRIMARY FEATURE */}
       <View style={st.filterStrip}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll}>
-          {FILTERS.map(f => (
+          {/* Auto filter — smart pick */}
+          <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            style={[st.filterChip, activeFilter === 'auto' && st.filterChipAuto]}>
+            <Text style={[st.filterChipT, activeFilter === 'auto' && st.filterChipTA]}>✦ Auto</Text>
+          </Pressable>
+          {FILTERS.filter(f => f.id !== 'original').map(f => (
             <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
               style={[st.filterChip, activeFilter === f.id && st.filterChipA]}>
               <View style={[st.filterDot, { backgroundColor: f.style.overlayColor || (f.id === 'bw' ? '#808080' : '#fafafa') }]} />
@@ -282,6 +294,7 @@ const st = StyleSheet.create({
   filterScroll: { paddingHorizontal: 12, gap: 6 },
   filterChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#18181b', borderWidth: 1, borderColor: '#27272a' },
   filterChipA: { backgroundColor: '#27272a', borderColor: '#3f3f46' },
+  filterChipAuto: { backgroundColor: '#22c55e20', borderColor: '#22c55e50' },
   filterDot: { width: 8, height: 8, borderRadius: 4 },
   filterChipT: { color: '#71717a', fontSize: 11, fontWeight: '600' },
   filterChipTA: { color: '#fafafa' },
