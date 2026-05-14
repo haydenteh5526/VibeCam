@@ -331,6 +331,38 @@ def health_check() -> HealthResponse:
     )
 
 
+@app.post("/grade", tags=["grading"])
+def grade_photo(
+    request: Request,
+    payload: bytes = Body(
+        ...,
+        media_type="application/octet-stream",
+        min_length=1,
+        max_length=MAX_UPLOAD_BYTES,
+    ),
+):
+    from grading import grade_image
+    from fastapi.responses import Response
+
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type and content_type != "application/octet-stream":
+        raise HTTPException(status_code=415, detail="content-type must be application/octet-stream")
+
+    try:
+        graded_bytes, preset_id, preset_name = grade_image(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not process image: {exc}")
+
+    return Response(
+        content=graded_bytes,
+        media_type="image/jpeg",
+        headers={
+            "X-Grade-Preset-Id": preset_id,
+            "X-Grade-Preset-Name": preset_name,
+        },
+    )
+
+
 @app.post("/uploads/init", response_model=UploadInitResponse, tags=["uploads"])
 def initialize_upload(payload: UploadInitRequest) -> UploadInitResponse:
     upload_session = _create_upload_session(payload)

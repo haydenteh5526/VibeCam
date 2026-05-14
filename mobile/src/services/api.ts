@@ -3,6 +3,20 @@ import { API_BASE_URL, CHUNK_SIZE } from '../constants';
 import { resolveFileSize } from '../utils';
 import type { SelectedFile, UploadInitResponse, UploadChunkResponse } from '../types';
 
+export async function gradePhoto(uri: string): Promise<{ gradedUri: string; presetId: string; presetName: string }> {
+  const response = await fetch(`${API_BASE_URL}/grade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: await fetch(uri).then(r => r.blob()),
+  });
+  if (!response.ok) throw new Error(`Grading failed: ${response.status}`);
+  const presetId = response.headers.get('X-Grade-Preset-Id') ?? 'unknown';
+  const presetName = response.headers.get('X-Grade-Preset-Name') ?? 'Unknown';
+  const blob = await response.blob();
+  const gradedUri = URL.createObjectURL(blob);
+  return { gradedUri, presetId, presetName };
+}
+
 export async function uploadFile(
   file: SelectedFile,
   onProgress: (pct: number) => void,
