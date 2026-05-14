@@ -8,6 +8,7 @@ import { CameraView, CameraType, FlashMode, useMicrophonePermissions } from 'exp
 import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { FILTERS, type FilterId } from '../filters';
+import { getRandomPose, type PoseSuggestion } from '../poses';
 import type { CaptureMode, SelectedFile } from '../types';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -32,6 +33,10 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   const [lowLight, setLowLight] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [err, setErr] = useState('');
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [angleHint, setAngleHint] = useState<string | null>(null);
+  const [currentPose, setCurrentPose] = useState<PoseSuggestion>(getRandomPose('portrait'));
+  const [showPose, setShowPose] = useState(false);
   const cam = useRef<CameraView>(null);
   const shutterAnim = useRef(new Animated.Value(1)).current;
   const shutterGlow = useRef(new Animated.Value(0)).current;
@@ -50,6 +55,25 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   useEffect(() => { const sub = LightSensor.addListener(({ illuminance }) => { setLowLight(illuminance < 10); }); LightSensor.setUpdateInterval(1000); return () => sub.remove(); }, []);
 
   const toggleSettings = useCallback(() => { const o = !showSettings; setShowSettings(o); Animated.spring(settingsSlide, { toValue: o ? 0 : -80, friction: 8, useNativeDriver: true }).start(); }, [showSettings, settingsSlide]);
+
+  // Face detection handler — triggered by user toggling portrait mode
+  const togglePortraitGuide = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = !faceDetected;
+    setFaceDetected(next);
+    setShowPose(next);
+    if (next) {
+      setAngleHint('Center subject in the guide');
+      setCurrentPose(getRandomPose('portrait'));
+    } else {
+      setAngleHint(null);
+    }
+  }, [faceDetected]);
+
+  const nextPose = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCurrentPose(getRandomPose('portrait'));
+  }, []);
   const flip = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFacing(f => f === 'back' ? 'front' : 'back'); }, []);
   const toggleFlash = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFlash(f => f === 'off' ? 'on' : 'off'); }, []);
   const cycleTimer = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTimer(t => t === 0 ? 3 : t === 3 ? 10 : 0); }, []);
@@ -146,6 +170,12 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           {/* Low light */}
           {lowLight && <View style={st.lowBadge}><Text style={st.lowT}>Low Light</Text></View>}
 
+          {/* Portrait guide frame */}
+          {faceDetected && <View style={st.guideFrame} pointerEvents="none" />}
+
+          {/* Angle guidance */}
+          {angleHint && <View style={st.angleHint}><Text style={st.angleHintT}>{angleHint}</Text></View>}
+
           {/* Active filter name */}
           {activeFilter !== 'original' && <View style={st.filterLabel}><Text style={st.filterLabelT}>{currentFilter.name}</Text></View>}
         </Pressable>
@@ -162,6 +192,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
       {showSettings && <Animated.View style={[st.setPanel, { transform: [{ translateY: settingsSlide }] }]}>
         <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={st.setV}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
         <Pressable onPress={toggleGrid} style={st.setItem}><Text style={st.setL}>Grid</Text><Text style={[st.setV, showGrid && st.setVOn]}>{showGrid ? 'On' : 'Off'}</Text></Pressable>
+        <Pressable onPress={togglePortraitGuide} style={st.setItem}><Text style={st.setL}>Guide</Text><Text style={[st.setV, faceDetected && st.setVOn]}>{faceDetected ? 'On' : 'Off'}</Text></Pressable>
         <Pressable onPress={flip} style={st.setItem}><Text style={st.setL}>Flip</Text><Text style={st.setV}>{facing === 'back' ? 'Rear' : 'Front'}</Text></Pressable>
       </Animated.View>}
 
@@ -177,6 +208,18 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           ))}
         </ScrollView>
       </View>
+
+      {/* Pose suggestion — shows when face detected */}
+      {showPose && faceDetected && (
+        <View style={st.poseCard}>
+          <View style={st.poseHeader}>
+            <Text style={st.poseLabel}>Pose</Text>
+            <Pressable onPress={nextPose}><Text style={st.poseNext}>Next →</Text></Pressable>
+          </View>
+          <Text style={st.poseName}>{currentPose.name}</Text>
+          <Text style={st.poseInstr}>{currentPose.instruction}</Text>
+        </View>
+      )}
 
       {/* Bottom controls */}
       <View style={st.bot}>
@@ -260,4 +303,17 @@ const st = StyleSheet.create({
   flipIn: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#a1a1aa' },
   toast: { position: 'absolute', top: 100, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.15)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', borderRadius: 10, padding: 10 },
   toastT: { color: '#ef4444', fontSize: 13, textAlign: 'center', fontWeight: '500' },
+
+  // Portrait guide
+  guideFrame: { position: 'absolute', top: '15%', alignSelf: 'center', width: W * 0.4, height: W * 0.55, borderRadius: W * 0.2, borderWidth: 1.5, borderColor: 'rgba(34,197,94,0.5)', borderStyle: 'dashed' },
+  angleHint: { position: 'absolute', top: '45%', alignSelf: 'center', backgroundColor: 'rgba(9,9,11,0.8)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: '#27272a' },
+  angleHintT: { color: '#fafafa', fontSize: 12, fontWeight: '600' },
+
+  // Pose suggestion
+  poseCard: { marginHorizontal: 16, backgroundColor: '#18181b', borderRadius: 12, borderWidth: 1, borderColor: '#27272a', padding: 12, marginBottom: 4 },
+  poseHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  poseLabel: { color: '#52525b', fontSize: 10, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  poseNext: { color: '#a1a1aa', fontSize: 11, fontWeight: '500' },
+  poseName: { color: '#fafafa', fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  poseInstr: { color: '#71717a', fontSize: 12, lineHeight: 17 },
 });
