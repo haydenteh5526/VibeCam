@@ -1,35 +1,48 @@
-import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 type Props = { hash: string | null; onGallery: () => void; onNew: () => void };
 
 export function DoneScreen({ hash, onGallery, onNew }: Props) {
+  const scale = useRef(new Animated.Value(0.8)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, friction: 6, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, [scale, fade]);
+
   return (
     <View style={s.bg}><StatusBar style="light" />
-      <View style={s.mid}>
-        <View style={s.circle}><Text style={s.mark}>✓</Text></View>
-        <Text style={s.title}>Done</Text>
-        {hash && <Text style={s.hash}>{hash.slice(0, 16)}</Text>}
+      <Animated.View style={[s.card, { opacity: fade, transform: [{ scale }] }]}>
+        <View style={s.check}><Text style={s.checkT}>✓</Text></View>
+        <Text style={s.title}>Upload Complete</Text>
+        <Text style={s.sub}>Your file has been securely uploaded</Text>
+        {hash && <View style={s.hashWrap}><Text style={s.hash}>{hash.slice(0, 20)}</Text></View>}
         <View style={s.row}>
-          <Pressable style={s.btnO} onPress={onGallery}><Text style={s.btnOT}>Uploads</Text></Pressable>
-          <Pressable style={s.btnW} onPress={onNew}><Text style={s.btnWT}>New</Text></Pressable>
+          <Pressable style={({ pressed }) => [s.btnO, pressed && s.pressed]} onPress={onGallery}><Text style={s.btnOT}>View Uploads</Text></Pressable>
+          <Pressable style={({ pressed }) => [s.btnS, pressed && s.pressed]} onPress={onNew}><Text style={s.btnST}>New Capture</Text></Pressable>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#000' },
-  mid: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  circle: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: '#30D158', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  mark: { fontSize: 28, color: '#30D158' },
-  title: { fontSize: 20, fontWeight: '500', color: '#fff', marginBottom: 6 },
-  hash: { fontSize: 11, color: 'rgba(255,255,255,0.25)', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 28 },
-  row: { flexDirection: 'row', gap: 12 },
-  btnO: { paddingVertical: 11, paddingHorizontal: 22, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)' },
-  btnOT: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  btnW: { paddingVertical: 11, paddingHorizontal: 22, borderRadius: 12, backgroundColor: '#fff' },
-  btnWT: { color: '#000', fontSize: 15, fontWeight: '600' },
+  bg: { flex: 1, backgroundColor: '#09090b', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card: { width: '100%', maxWidth: 340, backgroundColor: '#18181b', borderRadius: 16, borderWidth: 1, borderColor: '#27272a', padding: 32, alignItems: 'center' },
+  check: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  checkT: { fontSize: 22, color: '#22c55e' },
+  title: { color: '#fafafa', fontSize: 17, fontWeight: '600', letterSpacing: -0.3, marginBottom: 4 },
+  sub: { color: '#71717a', fontSize: 13, marginBottom: 16 },
+  hashWrap: { backgroundColor: '#27272a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, marginBottom: 20 },
+  hash: { color: '#a1a1aa', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  row: { flexDirection: 'row', gap: 8, width: '100%' },
+  btnO: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#27272a', alignItems: 'center' },
+  btnOT: { color: '#fafafa', fontSize: 13, fontWeight: '500' },
+  btnS: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: '#fafafa', alignItems: 'center' },
+  btnST: { color: '#09090b', fontSize: 13, fontWeight: '600' },
+  pressed: { opacity: 0.8 },
 });
