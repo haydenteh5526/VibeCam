@@ -173,7 +173,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
         </Pressable>
         {timer > 0 && <View style={c.timerBadge}><Text style={c.timerT}>{timer}s</Text></View>}
         <Pressable onPress={toggleSettings} style={({ pressed }) => [c.topPill, pressed && c.pressed]}>
-          <Text style={c.gearT}>⚙</Text>
+          <View style={c.gearDots}><View style={c.gd} /><View style={c.gd} /><View style={c.gd} /></View>
         </Pressable>
       </View>
 
@@ -267,7 +267,8 @@ const c = StyleSheet.create({
   topPill: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(24,24,27,0.8)', borderWidth: 1, borderColor: '#27272a', alignItems: 'center', justifyContent: 'center' },
   flashDot: { width: 3, height: 12, borderRadius: 2, backgroundColor: '#71717a' },
   flashOn: { backgroundColor: '#fbbf24' },
-  gearT: { color: '#a1a1aa', fontSize: 15 },
+  gearDots: { flexDirection: 'row', gap: 3 },
+  gd: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#a1a1aa' },
   timerBadge: { backgroundColor: 'rgba(24,24,27,0.8)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#27272a' },
   timerT: { color: '#fafafa', fontSize: 11, fontWeight: '600' },
   pressed: { opacity: 0.7 },
