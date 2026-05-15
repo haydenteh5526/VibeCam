@@ -50,6 +50,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   const [err, setErr] = useState('');
   const cam = useRef<CameraView>(null);
   const shutterAnim = useRef(new Animated.Value(1)).current;
+  const shutterGlow = useRef(new Animated.Value(0)).current;
   const flashOpacity = useRef(new Animated.Value(0)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
   const lastDist = useRef<number | null>(null);
@@ -60,6 +61,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
 
   useEffect(() => { Animated.timing(fadeIn, { toValue: 1, duration: 400, useNativeDriver: true }).start(); }, [fadeIn]);
+  useEffect(() => { Animated.loop(Animated.sequence([Animated.timing(shutterGlow, { toValue: 0.5, duration: 1200, useNativeDriver: true }), Animated.timing(shutterGlow, { toValue: 0, duration: 1200, useNativeDriver: true })])).start(); }, [shutterGlow]);
   useEffect(() => { if (recording) { recRef.current = 0; setRecSec(0); const iv = setInterval(() => { recRef.current++; setRecSec(recRef.current); }, 1000); return () => clearInterval(iv); } }, [recording]);
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
@@ -210,9 +212,10 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
         ))}
       </ScrollView>
 
-      {/* Shutter — large, centered */}
+      {/* Shutter — with glow */}
       <View style={st.shutterArea}>
         <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready}>
+          <Animated.View style={[st.shutterGlow, { opacity: shutterGlow }]} />
           <Animated.View style={[st.shOuter, { transform: [{ scale: shutterAnim }] }]}><View style={st.shInner} /></Animated.View>
         </Pressable>
       </View>
@@ -254,8 +257,8 @@ const st = StyleSheet.create({
   setV: { color: '#fff', fontSize: 11, fontWeight: '600' },
   setVOn: { color: '#FFD60A' },
 
-  // Viewfinder — edge to edge (iPhone layout)
-  vfWrap: { flex: 1 },
+  // Viewfinder — Bevel rounded card
+  vfWrap: { flex: 1, margin: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a' },
   overlay: { ...StyleSheet.absoluteFillObject },
   grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.2)' },
   guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' },
@@ -293,9 +296,10 @@ const st = StyleSheet.create({
   fChipTA: { color: '#fff' },
 
   // Shutter area
-  shutterArea: { alignItems: 'center', paddingVertical: 12 },
-  shOuter: { width: 72, height: 72, borderRadius: 36, borderWidth: 5, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
-  shInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
+  shutterArea: { alignItems: 'center', paddingVertical: 10 },
+  shutterGlow: { position: 'absolute', width: 82, height: 82, borderRadius: 41, backgroundColor: 'rgba(255,255,255,0.12)', top: -5, left: -5 },
+  shOuter: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
+  shInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
 
   // Bottom row
   botRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingBottom: 36 },
