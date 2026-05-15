@@ -145,26 +145,26 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   return (
     <Animated.View style={[st.bg, { opacity: fadeIn }]}><StatusBar style="light" />
 
-      {/* Top row */}
-      <View style={st.topRow}>
-        <View style={st.topLeft}>
-          <Text style={st.evText}>EV {exposure >= 0 ? '+' : ''}{exposure.toFixed(1)}</Text>
-          <Pressable onPress={cycleFormat} style={st.formatBadge}><Text style={st.formatT}>{format}</Text></Pressable>
-        </View>
-        <View style={st.topRight}>
-          {lowLight && <Pressable onPress={toggleNight} style={st.trBtn}><View style={[st.moonShape, nightMode && st.moonOn]} /></Pressable>}
-          <Pressable onPress={cycleFlash} style={st.trBtn}><View style={st.boltWrap}><View style={[st.boltTop, flashState !== 'off' && st.boltOn]} /><View style={[st.boltBot, flashState !== 'off' && st.boltOn]} /></View>{flashState !== 'off' && <Text style={st.trLabel}>{flashState === 'auto' ? 'A' : ''}</Text>}</Pressable>
-          <Pressable onPress={() => {}} style={st.trBtn}><View style={st.liveDot}><View style={st.liveInner} /></View></Pressable>
-          <Pressable onPress={() => setShowSettings(s => !s)} style={st.trBtn}><View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /></View></Pressable>
-        </View>
+      {/* Top bar — Bevel style: flash left, dots right, floating over viewfinder */}
+      <View style={st.topBar}>
+        <Pressable onPress={cycleFlash} style={st.topPill}>
+          <View style={st.boltWrap}><View style={[st.boltTop, flashState !== 'off' && st.boltOn]} /><View style={[st.boltBot, flashState !== 'off' && st.boltOn]} /></View>
+          {flashState === 'auto' && <Text style={st.trLabel}>A</Text>}
+        </Pressable>
+        {lowLight && <Pressable onPress={toggleNight} style={st.topPill}><View style={[st.moonShape, nightMode && st.moonOn]} /></Pressable>}
+        <Pressable onPress={() => setShowSettings(s => !s)} style={st.topPill}>
+          <View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /></View>
+        </Pressable>
       </View>
 
-      {/* Settings panel */}
+      {/* Settings panel — slides in */}
       {showSettings && (
         <View style={st.setPanel}>
+          <Pressable onPress={cycleFlash} style={st.setItem}><Text style={st.setL}>Flash</Text><Text style={[st.setV, flashState !== 'off' && st.setVOn]}>{flashState === 'auto' ? 'Auto' : flashState === 'on' ? 'On' : 'Off'}</Text></Pressable>
           <Pressable onPress={toggleNight} style={st.setItem}><Text style={st.setL}>Night</Text><Text style={[st.setV, nightMode && st.setVOn]}>{nightMode ? 'On' : 'Off'}</Text></Pressable>
           <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={[st.setV, timer > 0 && st.setVOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
           <Pressable onPress={cycleAspect} style={st.setItem}><Text style={st.setL}>Aspect</Text><Text style={st.setV}>{aspect}</Text></Pressable>
+          <Pressable onPress={cycleFormat} style={st.setItem}><Text style={st.setL}>Format</Text><Text style={st.setV}>{format}</Text></Pressable>
           <Pressable onPress={toggleGrid} style={st.setItem}><Text style={st.setL}>Grid</Text><Text style={[st.setV, showGrid && st.setVOn]}>{showGrid ? 'On' : 'Off'}</Text></Pressable>
         </View>
       )}
@@ -235,36 +235,27 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
 const st = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#0c0c0c' },
-  // Top row
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 10 },
-  topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  evText: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '500' },
-  formatBadge: { backgroundColor: '#1c1c1e', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14 },
-  formatT: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1c1c1e', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 4, gap: 2 },
-  trBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  boltWrap: { width: 10, height: 16, alignItems: 'center' },
+  // Top bar — floating over viewfinder
+  topBar: { position: 'absolute', top: 52, left: 16, right: 16, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topPill: { height: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: 'rgba(28,28,30,0.85)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 },
+  boltWrap: { alignItems: 'center' },
   boltTop: { width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 2, borderBottomWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fff' },
   boltBot: { width: 0, height: 0, borderLeftWidth: 2, borderRightWidth: 5, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fff', marginTop: -2 },
   boltOn: { borderBottomColor: '#FFD60A', borderTopColor: '#FFD60A' },
   moonShape: { width: 14, height: 14, borderRadius: 7, borderWidth: 2.5, borderColor: '#fff', borderRightColor: 'transparent' },
   moonOn: { borderColor: '#FFD60A', borderRightColor: 'transparent' },
-  trLabel: { color: '#FFD60A', fontSize: 7, fontWeight: '700', marginTop: -1 },
-  liveDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  liveDotOn: { borderColor: '#FFD60A' },
-  liveInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  dots: { flexDirection: 'row', flexWrap: 'wrap', width: 16, gap: 2, justifyContent: 'center' },
-  d: { width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#fff' },
+  trLabel: { color: '#FFD60A', fontSize: 8, fontWeight: '700' },
+  dots: { flexDirection: 'row', gap: 3 }, d: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' },
 
   // Settings panel
-  setPanel: { position: 'absolute', top: 102, left: 16, right: 16, zIndex: 20, backgroundColor: '#1c1c1e', borderRadius: 14, padding: 6, flexDirection: 'row', flexWrap: 'wrap' },
-  setItem: { width: '25%', paddingVertical: 10, alignItems: 'center' },
+  setPanel: { position: 'absolute', top: 96, left: 16, right: 16, zIndex: 20, backgroundColor: 'rgba(28,28,30,0.95)', borderRadius: 14, padding: 6, flexDirection: 'row', flexWrap: 'wrap' },
+  setItem: { width: '33%', paddingVertical: 10, alignItems: 'center' },
   setL: { color: '#636366', fontSize: 9, fontWeight: '500', marginBottom: 2 },
   setV: { color: '#fff', fontSize: 11, fontWeight: '600' },
   setVOn: { color: '#FFD60A' },
 
-  // Viewfinder — Bevel style with rounded corners
-  vfWrap: { flex: 1, marginHorizontal: 6, borderRadius: 16, overflow: 'hidden' },
+  // Viewfinder — Bevel rounded card
+  vfWrap: { flex: 1, marginHorizontal: 6, borderRadius: 18, overflow: 'hidden' },
   overlay: { ...StyleSheet.absoluteFillObject },
   grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.2)' },
   guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' },
