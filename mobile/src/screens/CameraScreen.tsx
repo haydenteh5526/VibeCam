@@ -164,14 +164,14 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
         </Pressable>
       </View>
 
-      {/* Top controls row — iPhone style */}
+      {/* Top controls row — clean geometric icons */}
       <View style={st.topRow}>
-        <Pressable onPress={cycleFlash} style={st.topBtn}><Text style={[st.topBtnT, flashState !== 'off' && st.topBtnActive]}>{flashState === 'auto' ? '⚡A' : flashState === 'on' ? '⚡' : '⚡̸'}</Text></Pressable>
-        <Pressable onPress={toggleNight} style={st.topBtn}><Text style={[st.topBtnT, nightMode && st.topBtnActive]}>☽</Text></Pressable>
-        <Pressable onPress={cycleTimer} style={st.topBtn}><Text style={[st.topBtnT, timer > 0 && st.topBtnActive]}>{timer > 0 ? `${timer}s` : '⏱'}</Text></Pressable>
+        <Pressable onPress={cycleFlash} style={st.topBtn}><View style={[st.flashBar, flashState !== 'off' && st.flashBarOn]} />{flashState === 'auto' && <Text style={st.flashA}>A</Text>}</Pressable>
+        <Pressable onPress={toggleNight} style={st.topBtn}><View style={[st.moonDot, nightMode && st.moonOn]} /></Pressable>
+        <Pressable onPress={cycleTimer} style={st.topBtn}><Text style={[st.topBtnT, timer > 0 && st.topBtnActive]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
         <Pressable onPress={cycleAspect} style={st.topBtn}><Text style={st.topBtnT}>{aspect}</Text></Pressable>
         <Pressable onPress={cycleFormat} style={st.topBtn}><Text style={st.topBtnT}>{format}</Text></Pressable>
-        <Pressable onPress={toggleGrid} style={st.topBtn}><Text style={[st.topBtnT, showGrid && st.topBtnActive]}>⊞</Text></Pressable>
+        <Pressable onPress={toggleGrid} style={st.topBtn}><View style={[st.gridIcon, showGrid && st.gridIconOn]} /></Pressable>
       </View>
 
       {/* Zoom toggle row — 0.5x 1x 2x 5x */}
@@ -202,8 +202,9 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
       {/* Bottom — mode + shutter + flip */}
       <View style={st.bot}>
         <View style={st.modeRow}>
-          <Pressable onPress={() => !recording && setMode('photo')}><Text style={[st.modeT, mode === 'photo' && st.modeTOn]}>PHOTO</Text></Pressable>
-          <Pressable onPress={() => !recording && setMode('video')}><Text style={[st.modeT, mode === 'video' && st.modeTOn]}>VIDEO</Text></Pressable>
+          <Pressable onPress={() => { if (!recording) { setMode('photo'); setFaceDetected(false); setShowPose(false); } }}><Text style={[st.modeT, mode === 'photo' && !faceDetected && st.modeTOn]}>PHOTO</Text></Pressable>
+          <Pressable onPress={() => { if (!recording) { setMode('photo'); setFaceDetected(true); setShowPose(true); setCurrentPose(getRandomPose('portrait')); } }}><Text style={[st.modeT, faceDetected && st.modeTOn]}>PORTRAIT</Text></Pressable>
+          <Pressable onPress={() => { if (!recording) { setMode('video'); setFaceDetected(false); setShowPose(false); } }}><Text style={[st.modeT, mode === 'video' && st.modeTOn]}>VIDEO</Text></Pressable>
         </View>
         <View style={st.ctrlRow}>
           <Pressable onPress={onGallery} style={st.thumb}>{lastThumb ? <Image source={{ uri: lastThumb }} style={st.thumbImg} /> : <View style={st.thumbPh} />}</Pressable>
@@ -212,7 +213,6 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           </Pressable>
           <Pressable onPress={flip} style={st.flipBtn}><View style={st.flipIcon} /><View style={st.flipArrow} /></Pressable>
         </View>
-        <Pressable onPress={toggleGuide} style={st.guideBtn}><Text style={[st.guideBtnT, faceDetected && st.guideBtnTA]}>Portrait Guide</Text></Pressable>
       </View>
 
       {err.length > 0 && <View style={st.toast}><Text style={st.toastT}>{err}</Text></View>}
@@ -240,9 +240,16 @@ const st = StyleSheet.create({
 
   // Top row
   topRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 8, gap: 6 },
-  topBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' },
+  topBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', minWidth: 32, height: 28, flexDirection: 'row', gap: 2 },
   topBtnT: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '600' },
   topBtnActive: { color: '#FFD60A' },
+  flashBar: { width: 3, height: 12, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.5)' },
+  flashBarOn: { backgroundColor: '#FFD60A' },
+  flashA: { color: '#FFD60A', fontSize: 9, fontWeight: '700' },
+  moonDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', borderTopColor: 'transparent' },
+  moonOn: { borderColor: '#FFD60A', borderTopColor: 'transparent' },
+  gridIcon: { width: 12, height: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.5)', borderRadius: 1 },
+  gridIconOn: { borderColor: '#FFD60A' },
 
   // Zoom row
   zoomRow: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 6 },
@@ -282,9 +289,6 @@ const st = StyleSheet.create({
   flipBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
   flipIcon: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#fff' },
   flipArrow: { position: 'absolute', top: 8, right: 10, width: 5, height: 5, borderTopWidth: 1.5, borderRightWidth: 1.5, borderColor: '#fff', transform: [{ rotate: '45deg' }] },
-  guideBtn: { alignSelf: 'center', paddingVertical: 5, paddingHorizontal: 14, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.06)' },
-  guideBtnT: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500' },
-  guideBtnTA: { color: '#22c55e' },
   toast: { position: 'absolute', top: 50, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 10, padding: 10 },
   toastT: { color: '#fff', fontSize: 12, textAlign: 'center' },
 });
