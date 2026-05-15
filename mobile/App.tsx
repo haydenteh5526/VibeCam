@@ -67,8 +67,8 @@ export default function App() {
   }, [file]);
 
   const onGallery = useCallback(async () => {
-    const items = await fetchGallery();
-    setGallery(items); setScreen('gallery');
+    try { const items = await fetchGallery(); setGallery(items); } catch { setGallery([]); }
+    setScreen('gallery');
   }, []);
 
   const reset = useCallback(() => {

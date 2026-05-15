@@ -146,9 +146,9 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Pressable onPress={cycleFormat} style={st.formatBadge}><Text style={st.formatT}>{format}</Text></Pressable>
         </View>
         <View style={st.topRight}>
-          <Pressable onPress={toggleNight} style={st.trBtn}><View style={[st.trIcon, nightMode && st.trIconOn]} /></Pressable>
-          <Pressable onPress={cycleFlash} style={st.trBtn}><View style={[st.flashBar, flashState !== 'off' && st.flashBarOn]} /></Pressable>
-          <Pressable onPress={cycleTimer} style={st.trBtn}><View style={[st.timerDot, timer > 0 && st.timerDotOn]} /></Pressable>
+          <Pressable onPress={toggleNight} style={st.trBtn}><Text style={[st.trT, nightMode && st.trTOn]}>☾</Text></Pressable>
+          <Pressable onPress={cycleFlash} style={st.trBtn}><Text style={[st.trT, flashState !== 'off' && st.trTOn]}>↯</Text></Pressable>
+          <Pressable onPress={cycleTimer} style={st.trBtn}><View style={[st.liveDot, timer > 0 && st.liveDotOn]}><View style={st.liveInner} /></View></Pressable>
           <Pressable onPress={() => setShowSettings(s => !s)} style={st.trBtn}><View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /></View></Pressable>
         </View>
       </View>
@@ -196,6 +196,14 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Text style={st.poseN}>{currentPose.name}</Text><Text style={st.poseI}>{currentPose.instruction}</Text></View>
       )}
 
+      {/* Filter strip — Auto (AI grading) + manual presets */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll} style={st.filterArea}>
+        <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}><Text style={[st.fChipT, activeFilter === 'auto' && st.fChipTA]}>Auto</Text></Pressable>
+        {FILTERS.filter(f => f.id !== 'original').map(f => (
+          <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}><Text style={[st.fChipT, activeFilter === f.id && st.fChipTA]}>{f.name}</Text></Pressable>
+        ))}
+      </ScrollView>
+
       {/* Shutter — large, centered */}
       <View style={st.shutterArea}>
         <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready}>
@@ -210,7 +218,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Pressable onPress={() => { setFaceDetected(false); setShowPose(false); }} style={[st.modeOpt, !faceDetected && st.modeOptA]}><Text style={[st.modeOptT, !faceDetected && st.modeOptTA]}>PHOTO</Text></Pressable>
           <Pressable onPress={() => { setFaceDetected(true); setShowPose(true); setCurrentPose(getRandomPose('portrait')); }} style={[st.modeOpt, faceDetected && st.modeOptA]}><Text style={[st.modeOptT, faceDetected && st.modeOptTA]}>PORTRAIT</Text></Pressable>
         </View>
-        <Pressable onPress={flip} style={st.flipBtn}><View style={st.flipIcon} /></Pressable>
+        <Pressable onPress={flip} style={st.flipBtn}><Text style={st.flipT}>⟳</Text></Pressable>
       </View>
 
       {err.length > 0 && <View style={st.toast}><Text style={st.toastT}>{err}</Text></View>}
@@ -229,13 +237,11 @@ const st = StyleSheet.create({
   formatT: { color: '#fff', fontSize: 12, fontWeight: '600' },
   topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2c2c2e', borderRadius: 18, paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
   trBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  trIcon: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' },
-  trIconOn: { borderColor: '#FFD60A', borderTopColor: 'transparent' },
-  flashBar: { width: 3, height: 14, borderRadius: 1.5, backgroundColor: '#fff' },
-  flashBarOn: { backgroundColor: '#FFD60A' },
-  flashA: { color: '#FFD60A', fontSize: 8, fontWeight: '700', position: 'absolute', bottom: 2 },
-  timerDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1.5, borderColor: '#fff' },
-  timerDotOn: { backgroundColor: '#FFD60A', borderColor: '#FFD60A' },
+  trT: { color: '#fff', fontSize: 18 },
+  trTOn: { color: '#FFD60A' },
+  liveDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  liveDotOn: { borderColor: '#FFD60A' },
+  liveInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   dots: { flexDirection: 'row', flexWrap: 'wrap', width: 18, gap: 2, justifyContent: 'center' },
   d: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' },
 
@@ -291,7 +297,16 @@ const st = StyleSheet.create({
   modeOptT: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
   modeOptTA: { color: '#FFD60A' },
   flipBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#2c2c2e', alignItems: 'center', justifyContent: 'center' },
-  flipIcon: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#fff' },
+  flipT: { color: '#fff', fontSize: 22 },
+
+  // Filter strip
+  filterArea: { maxHeight: 34, marginBottom: 4 },
+  filterScroll: { paddingHorizontal: 12, gap: 5 },
+  fChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
+  fChipA: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  fChipAuto: { backgroundColor: 'rgba(34,197,94,0.15)' },
+  fChipT: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600' },
+  fChipTA: { color: '#fff' },
 
   toast: { position: 'absolute', top: 110, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 10, padding: 10 },
   toastT: { color: '#fff', fontSize: 12, textAlign: 'center' },
