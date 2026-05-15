@@ -127,7 +127,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   }, [ready, micPerm, requestMic, onCapture]);
 
   const stopRec = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); cam.current?.stopRecording(); }, []);
-  const onShutter = useCallback(() => { if (mode === 'photo') captureWithTimer(); else { if (recording) stopRec(); else startRec(); } }, [mode, recording, captureWithTimer, startRec, stopRec]);
+  const onShutter = useCallback(() => { captureWithTimer(); }, [captureWithTimer]);
 
   const modePan = useRef(PanResponder.create({ onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 25 && Math.abs(g.dy) < 20, onPanResponderRelease: (_, g) => { if (recording) return; if (g.dx < -40) setMode('video'); else if (g.dx > 40) setMode('photo'); } })).current;
 
@@ -155,8 +155,6 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           {showExposure && <View style={st.expArea} {...expPan.panHandlers}><View style={st.expTrack}><View style={[st.expDot, { bottom: `${((exposure + 2) / 4) * 100}%` }]} /></View></View>}
           {/* Night mode indicator */}
           {nightMode && <View style={st.nightBadge}><Text style={st.nightT}>Night</Text></View>}
-          {/* Recording */}
-          {recording && <View style={st.recBadge}><View style={st.recDot} /><Text style={st.recT}>{String(Math.floor(recSec / 60)).padStart(2, '0')}:{String(recSec % 60).padStart(2, '0')}</Text></View>}
           {/* Countdown */}
           {countdown !== null && <View style={st.countBg}><Text style={st.countN}>{countdown}</Text></View>}
           {/* Flash anim */}
@@ -202,14 +200,13 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
       {/* Bottom — mode + shutter + flip */}
       <View style={st.bot}>
         <View style={st.modeRow}>
-          <Pressable onPress={() => { if (!recording) { setMode('photo'); setFaceDetected(false); setShowPose(false); } }}><Text style={[st.modeT, mode === 'photo' && !faceDetected && st.modeTOn]}>PHOTO</Text></Pressable>
-          <Pressable onPress={() => { if (!recording) { setMode('photo'); setFaceDetected(true); setShowPose(true); setCurrentPose(getRandomPose('portrait')); } }}><Text style={[st.modeT, faceDetected && st.modeTOn]}>PORTRAIT</Text></Pressable>
-          <Pressable onPress={() => { if (!recording) { setMode('video'); setFaceDetected(false); setShowPose(false); } }}><Text style={[st.modeT, mode === 'video' && st.modeTOn]}>VIDEO</Text></Pressable>
+          <Pressable onPress={() => { setFaceDetected(false); setShowPose(false); }}><Text style={[st.modeT, !faceDetected && st.modeTOn]}>PHOTO</Text></Pressable>
+          <Pressable onPress={() => { setFaceDetected(true); setShowPose(true); setCurrentPose(getRandomPose('portrait')); }}><Text style={[st.modeT, faceDetected && st.modeTOn]}>PORTRAIT</Text></Pressable>
         </View>
         <View style={st.ctrlRow}>
           <Pressable onPress={onGallery} style={st.thumb}>{lastThumb ? <Image source={{ uri: lastThumb }} style={st.thumbImg} /> : <View style={st.thumbPh} />}</Pressable>
           <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready}>
-            <Animated.View style={[st.shOuter, { transform: [{ scale: shutterAnim }] }]}><View style={[st.shInner, recording && st.shRec]} /></Animated.View>
+            <Animated.View style={[st.shOuter, { transform: [{ scale: shutterAnim }] }]}><View style={st.shInner} /></Animated.View>
           </Pressable>
           <Pressable onPress={flip} style={st.flipBtn}><View style={st.flipIcon} /><View style={st.flipArrow} /></Pressable>
         </View>
