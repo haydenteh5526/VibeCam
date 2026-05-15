@@ -61,7 +61,13 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
   useEffect(() => { Animated.timing(fadeIn, { toValue: 1, duration: 400, useNativeDriver: true }).start(); }, [fadeIn]);
   useEffect(() => { if (recording) { recRef.current = 0; setRecSec(0); const iv = setInterval(() => { recRef.current++; setRecSec(recRef.current); }, 1000); return () => clearInterval(iv); } }, [recording]);
-  useEffect(() => { const sub = LightSensor.addListener(({ illuminance }) => { setLowLight(illuminance < 10); if (illuminance < 10) setNightMode(true); }); LightSensor.setUpdateInterval(2000); return () => sub.remove(); }, []);
+  useEffect(() => {
+    let sub: { remove: () => void } | null = null;
+    LightSensor.isAvailableAsync().then(available => {
+      if (available) { sub = LightSensor.addListener(({ illuminance }) => { setLowLight(illuminance < 10); }); LightSensor.setUpdateInterval(2000); }
+    }).catch(() => {});
+    return () => { sub?.remove(); };
+  }, []);
 
   // Controls
   const cycleFlash = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFlashState(f => f === 'auto' ? 'on' : f === 'on' ? 'off' : 'auto'); }, []);
@@ -146,9 +152,9 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Pressable onPress={cycleFormat} style={st.formatBadge}><Text style={st.formatT}>{format}</Text></Pressable>
         </View>
         <View style={st.topRight}>
-          {lowLight && <Pressable onPress={toggleNight} style={st.trBtn}><View style={[st.moonShape, nightMode && st.moonOn]} />{nightMode && <Text style={st.trLabel}>On</Text>}</Pressable>}
-          <Pressable onPress={cycleFlash} style={st.trBtn}><View style={[st.boltShape, flashState !== 'off' && st.boltOn]} />{flashState !== 'off' && <Text style={st.trLabel}>{flashState === 'auto' ? 'A' : 'On'}</Text>}</Pressable>
-          <Pressable onPress={cycleTimer} style={st.trBtn}><View style={[st.liveDot, timer > 0 && st.liveDotOn]}><View style={st.liveInner} /></View>{timer > 0 && <Text style={st.trLabel}>{timer}s</Text>}</Pressable>
+          {lowLight && <Pressable onPress={toggleNight} style={st.trBtn}><View style={[st.moonShape, nightMode && st.moonOn]} /></Pressable>}
+          <Pressable onPress={cycleFlash} style={st.trBtn}><View style={st.boltWrap}><View style={[st.boltTop, flashState !== 'off' && st.boltOn]} /><View style={[st.boltBot, flashState !== 'off' && st.boltOn]} /></View>{flashState !== 'off' && <Text style={st.trLabel}>{flashState === 'auto' ? 'A' : ''}</Text>}</Pressable>
+          <Pressable onPress={() => {}} style={st.trBtn}><View style={st.liveDot}><View style={st.liveInner} /></View></Pressable>
           <Pressable onPress={() => setShowSettings(s => !s)} style={st.trBtn}><View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /></View></Pressable>
         </View>
       </View>
@@ -237,8 +243,10 @@ const st = StyleSheet.create({
   formatT: { color: '#fff', fontSize: 11, fontWeight: '600' },
   topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1c1c1e', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 4, gap: 2 },
   trBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  boltShape: { width: 4, height: 14, backgroundColor: '#fff', borderRadius: 1, transform: [{ skewX: '-8deg' }] },
-  boltOn: { backgroundColor: '#FFD60A' },
+  boltWrap: { width: 10, height: 16, alignItems: 'center' },
+  boltTop: { width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 2, borderBottomWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fff' },
+  boltBot: { width: 0, height: 0, borderLeftWidth: 2, borderRightWidth: 5, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fff', marginTop: -2 },
+  boltOn: { borderBottomColor: '#FFD60A', borderTopColor: '#FFD60A' },
   moonShape: { width: 14, height: 14, borderRadius: 7, borderWidth: 2.5, borderColor: '#fff', borderRightColor: 'transparent' },
   moonOn: { borderColor: '#FFD60A', borderRightColor: 'transparent' },
   trLabel: { color: '#FFD60A', fontSize: 7, fontWeight: '700', marginTop: -1 },
