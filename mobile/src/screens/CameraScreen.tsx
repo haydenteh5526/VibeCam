@@ -204,11 +204,14 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Text style={st.poseN}>{currentPose.name}</Text><Text style={st.poseI}>{currentPose.instruction}</Text></View>
       )}
 
-      {/* Filter strip — Auto (AI grading) + manual presets */}
+      {/* Filter strip — Auto (AI grading) + manual presets with color dots */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll} style={st.filterArea}>
         <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}><Text style={[st.fChipT, activeFilter === 'auto' && st.fChipTA]}>Auto</Text></Pressable>
         {FILTERS.filter(f => f.id !== 'original').map(f => (
-          <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}><Text style={[st.fChipT, activeFilter === f.id && st.fChipTA]}>{f.name}</Text></Pressable>
+          <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}>
+            <View style={[st.fDot, { backgroundColor: f.style.overlayColor || (f.id === 'bw' ? '#808080' : '#fff') }]} />
+            <Text style={[st.fChipT, activeFilter === f.id && st.fChipTA]}>{f.name}</Text>
+          </Pressable>
         ))}
       </ScrollView>
 
@@ -289,9 +292,10 @@ const st = StyleSheet.create({
   // Filter strip
   filterArea: { maxHeight: 34, marginTop: 6 },
   filterScroll: { paddingHorizontal: 12, gap: 5 },
-  fChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#1c1c1e', borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
+  fChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#1c1c1e', borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
   fChipA: { backgroundColor: '#2c2c2e', borderColor: 'rgba(255,255,255,0.08)' },
   fChipAuto: { backgroundColor: 'rgba(34,197,94,0.15)' },
+  fDot: { width: 8, height: 8, borderRadius: 4 },
   fChipT: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600' },
   fChipTA: { color: '#fff' },
 
