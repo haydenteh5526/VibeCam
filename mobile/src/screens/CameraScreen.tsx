@@ -139,17 +139,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   return (
     <Animated.View style={[st.bg, { opacity: fadeIn }]}><StatusBar style="light" />
 
-      {/* Top controls — absolute over viewfinder */}
-      <View style={st.topRow}>
-        <Pressable onPress={cycleFlash} style={st.topBtn}><View style={[st.flashBar, flashState !== 'off' && st.flashBarOn]} />{flashState === 'auto' && <Text style={st.flashA}>A</Text>}</Pressable>
-        <Pressable onPress={toggleNight} style={st.topBtn}><View style={[st.moonDot, nightMode && st.moonOn]} /></Pressable>
-        <Pressable onPress={cycleTimer} style={st.topBtn}><Text style={[st.topBtnT, timer > 0 && st.topBtnActive]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
-        <Pressable onPress={cycleAspect} style={st.topBtn}><Text style={st.topBtnT}>{aspect}</Text></Pressable>
-        <Pressable onPress={cycleFormat} style={st.topBtn}><Text style={st.topBtnT}>{format}</Text></Pressable>
-        <Pressable onPress={toggleGrid} style={st.topBtn}><View style={[st.gridIcon, showGrid && st.gridIconOn]} /></Pressable>
-      </View>
-
-      {/* Viewfinder — fills available space */}
+      {/* Viewfinder — fills all space */}
       <View style={st.vfWrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onTapFocus}
           onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })} onTouchEnd={onPinchEnd}>
@@ -165,6 +155,29 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           {flashAnimActive && <Animated.View style={[st.flashOver, { opacity: flashOpacity }]} pointerEvents="none" />}
         </Pressable>
       </View>
+
+      {/* Top bar — minimal: flash + ••• toggle */}
+      <View style={st.topBar}>
+        <Pressable onPress={cycleFlash} style={st.topPill}>
+          <View style={[st.flashBar, flashState !== 'off' && st.flashBarOn]} />
+          {flashState === 'auto' && <Text style={st.flashA}>A</Text>}
+        </Pressable>
+        {timer > 0 && <View style={st.timerBadge}><Text style={st.timerT}>{timer}s</Text></View>}
+        <Pressable onPress={() => setShowSettings(s => !s)} style={st.topPill}>
+          <View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /></View>
+        </Pressable>
+      </View>
+
+      {/* Settings panel — slides in on toggle */}
+      {showSettings && (
+        <View style={st.setPanel}>
+          <Pressable onPress={toggleNight} style={st.setItem}><Text style={st.setL}>Night</Text><Text style={[st.setV, nightMode && st.setVOn]}>{nightMode ? 'On' : 'Off'}</Text></Pressable>
+          <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={[st.setV, timer > 0 && st.setVOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
+          <Pressable onPress={cycleAspect} style={st.setItem}><Text style={st.setL}>Aspect</Text><Text style={st.setV}>{aspect}</Text></Pressable>
+          <Pressable onPress={cycleFormat} style={st.setItem}><Text style={st.setL}>Format</Text><Text style={st.setV}>{format}</Text></Pressable>
+          <Pressable onPress={toggleGrid} style={st.setItem}><Text style={st.setL}>Grid</Text><Text style={[st.setV, showGrid && st.setVOn]}>{showGrid ? 'On' : 'Off'}</Text></Pressable>
+        </View>
+      )}
 
       {/* Bottom section */}
       <View style={st.botSection}>
@@ -215,7 +228,6 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
 const st = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#000' },
-  // Viewfinder fills space between top and bottom
   vfWrap: { flex: 1 },
   overlay: { ...StyleSheet.absoluteFillObject },
   grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.2)' },
@@ -228,38 +240,36 @@ const st = StyleSheet.create({
   countN: { fontSize: 72, fontWeight: '100', color: '#fff' },
   flashOver: { ...StyleSheet.absoluteFillObject, backgroundColor: '#fff' },
 
-  // Top row — absolute, floats over viewfinder top
-  topRow: { position: 'absolute', top: 50, left: 0, right: 0, zIndex: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingHorizontal: 12 },
-  topBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', minWidth: 32, height: 28, flexDirection: 'row', gap: 2 },
-  topBtnT: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' },
-  topBtnActive: { color: '#FFD60A' },
+  // Top bar — absolute, minimal
+  topBar: { position: 'absolute', top: 52, left: 16, right: 16, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topPill: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 },
   flashBar: { width: 3, height: 12, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' },
   flashBarOn: { backgroundColor: '#FFD60A' },
   flashA: { color: '#FFD60A', fontSize: 9, fontWeight: '700' },
-  moonDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)', borderTopColor: 'transparent' },
-  moonOn: { borderColor: '#FFD60A', borderTopColor: 'transparent' },
-  gridIcon: { width: 12, height: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)', borderRadius: 1 },
-  gridIconOn: { borderColor: '#FFD60A' },
+  timerBadge: { backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  timerT: { color: '#FFD60A', fontSize: 11, fontWeight: '600' },
+  dots: { flexDirection: 'row', gap: 3 }, d: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' },
+
+  // Settings panel — absolute below top bar
+  setPanel: { position: 'absolute', top: 96, left: 16, right: 16, zIndex: 10, backgroundColor: 'rgba(24,24,27,0.95)', borderRadius: 12, borderWidth: 1, borderColor: '#27272a', padding: 4, flexDirection: 'row', flexWrap: 'wrap' },
+  setItem: { width: '33%', paddingVertical: 10, alignItems: 'center' },
+  setL: { color: '#71717a', fontSize: 9, fontWeight: '500', marginBottom: 2 },
+  setV: { color: '#a1a1aa', fontSize: 12, fontWeight: '600' },
+  setVOn: { color: '#FFD60A' },
 
   // Bottom section
   botSection: { backgroundColor: '#000', paddingBottom: 30, gap: 8 },
-
-  // Zoom row
-  zoomRow: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 8 },
+  zoomRow: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 6 },
   zoomPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)' },
   zoomPillA: { backgroundColor: 'rgba(255,215,0,0.15)' },
   zoomPillT: { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '700' },
   zoomPillTA: { color: '#FFD60A' },
-
-  // Pose
   poseCard: { marginHorizontal: 16, backgroundColor: '#18181b', borderRadius: 10, borderWidth: 1, borderColor: '#27272a', padding: 10 },
   poseRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
   poseL: { color: '#52525b', fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
   poseNext: { color: '#a1a1aa', fontSize: 10 },
   poseN: { color: '#fafafa', fontSize: 13, fontWeight: '600' },
   poseI: { color: '#71717a', fontSize: 11, lineHeight: 15 },
-
-  // Filter strip
   filterArea: { maxHeight: 36 },
   filterScroll: { paddingHorizontal: 12, gap: 5 },
   fChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
@@ -267,12 +277,10 @@ const st = StyleSheet.create({
   fChipAuto: { backgroundColor: 'rgba(34,197,94,0.15)' },
   fChipT: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600' },
   fChipTA: { color: '#fafafa' },
-
-  // Mode + controls
   modeRow: { flexDirection: 'row', justifyContent: 'center', gap: 28 },
   modeT: { fontSize: 12, fontWeight: '600', letterSpacing: 1, color: 'rgba(255,255,255,0.3)' },
   modeTOn: { color: '#FFD60A' },
-  ctrlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 24, paddingTop: 8 },
+  ctrlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 24, paddingTop: 6 },
   thumb: { width: 42, height: 42, borderRadius: 8, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
   thumbImg: { width: '100%', height: '100%' }, thumbPh: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
   shOuter: { width: 68, height: 68, borderRadius: 34, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
