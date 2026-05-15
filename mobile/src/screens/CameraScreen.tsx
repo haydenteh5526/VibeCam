@@ -139,7 +139,31 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   return (
     <Animated.View style={[st.bg, { opacity: fadeIn }]}><StatusBar style="light" />
 
-      {/* Viewfinder — fills all space */}
+      {/* Top row */}
+      <View style={st.topRow}>
+        <View style={st.topLeft}>
+          <Text style={st.evText}>EV {exposure >= 0 ? '+' : ''}{exposure.toFixed(1)}</Text>
+          <Pressable onPress={cycleFormat} style={st.formatBadge}><Text style={st.formatT}>{format}</Text></Pressable>
+        </View>
+        <View style={st.topRight}>
+          <Pressable onPress={toggleNight} style={st.trBtn}><View style={[st.trIcon, nightMode && st.trIconOn]} /></Pressable>
+          <Pressable onPress={cycleFlash} style={st.trBtn}><View style={[st.flashBar, flashState !== 'off' && st.flashBarOn]} /></Pressable>
+          <Pressable onPress={cycleTimer} style={st.trBtn}><View style={[st.timerDot, timer > 0 && st.timerDotOn]} /></Pressable>
+          <Pressable onPress={() => setShowSettings(s => !s)} style={st.trBtn}><View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /></View></Pressable>
+        </View>
+      </View>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <View style={st.setPanel}>
+          <Pressable onPress={toggleNight} style={st.setItem}><Text style={st.setL}>Night</Text><Text style={[st.setV, nightMode && st.setVOn]}>{nightMode ? 'On' : 'Off'}</Text></Pressable>
+          <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={[st.setV, timer > 0 && st.setVOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
+          <Pressable onPress={cycleAspect} style={st.setItem}><Text style={st.setL}>Aspect</Text><Text style={st.setV}>{aspect}</Text></Pressable>
+          <Pressable onPress={toggleGrid} style={st.setItem}><Text style={st.setL}>Grid</Text><Text style={[st.setV, showGrid && st.setVOn]}>{showGrid ? 'On' : 'Off'}</Text></Pressable>
+        </View>
+      )}
+
+      {/* Viewfinder */}
       <View style={st.vfWrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onTapFocus}
           onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })} onTouchEnd={onPinchEnd}>
@@ -149,75 +173,44 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           {currentFilter?.style.overlayColor && <View style={[st.overlay, { backgroundColor: currentFilter.style.overlayColor, opacity: currentFilter.style.overlayOpacity ?? 0.1 }]} pointerEvents="none" />}
           {showGrid && <View style={st.grid} pointerEvents="none"><View style={[st.gl, { left: '33.3%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { left: '66.6%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { top: '33.3%', left: 0, right: 0, height: 1 }]} /><View style={[st.gl, { top: '66.6%', left: 0, right: 0, height: 1 }]} /></View>}
           {faceDetected && <View style={st.guideOval} pointerEvents="none" />}
+          {/* Yellow crosshair center */}
+          <View style={st.crosshair} pointerEvents="none"><View style={st.crossH} /><View style={st.crossV} /></View>
           {showExposure && <View style={st.expArea} {...expPan.panHandlers}><View style={st.expTrack}><View style={[st.expDot, { bottom: `${((exposure + 2) / 4) * 100}%` }]} /></View></View>}
           {nightMode && <View style={st.nightBadge}><Text style={st.nightT}>Night</Text></View>}
           {countdown !== null && <View style={st.countBg}><Text style={st.countN}>{countdown}</Text></View>}
           {flashAnimActive && <Animated.View style={[st.flashOver, { opacity: flashOpacity }]} pointerEvents="none" />}
+          {/* Zoom pills inside viewfinder bottom */}
+          <View style={st.zoomRow}>
+            {ZOOM_LABELS.map((label, i) => (
+              <Pressable key={i} onPress={() => selectZoom(i)} style={[st.zoomPill, activeZoomIdx === i && st.zoomPillA]}>
+                <Text style={[st.zoomPillT, activeZoomIdx === i && st.zoomPillTA]}>{label}×</Text>
+              </Pressable>
+            ))}
+          </View>
         </Pressable>
       </View>
 
-      {/* Top bar — minimal: flash + ••• toggle */}
-      <View style={st.topBar}>
-        <Pressable onPress={cycleFlash} style={st.topPill}>
-          <View style={[st.flashBar, flashState !== 'off' && st.flashBarOn]} />
-          {flashState === 'auto' && <Text style={st.flashA}>A</Text>}
-        </Pressable>
-        {timer > 0 && <View style={st.timerBadge}><Text style={st.timerT}>{timer}s</Text></View>}
-        <Pressable onPress={() => setShowSettings(s => !s)} style={st.topPill}>
-          <View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /></View>
-        </Pressable>
-      </View>
-
-      {/* Settings panel — slides in on toggle */}
-      {showSettings && (
-        <View style={st.setPanel}>
-          <Pressable onPress={toggleNight} style={st.setItem}><Text style={st.setL}>Night</Text><Text style={[st.setV, nightMode && st.setVOn]}>{nightMode ? 'On' : 'Off'}</Text></Pressable>
-          <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={[st.setV, timer > 0 && st.setVOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
-          <Pressable onPress={cycleAspect} style={st.setItem}><Text style={st.setL}>Aspect</Text><Text style={st.setV}>{aspect}</Text></Pressable>
-          <Pressable onPress={cycleFormat} style={st.setItem}><Text style={st.setL}>Format</Text><Text style={st.setV}>{format}</Text></Pressable>
-          <Pressable onPress={toggleGrid} style={st.setItem}><Text style={st.setL}>Grid</Text><Text style={[st.setV, showGrid && st.setVOn]}>{showGrid ? 'On' : 'Off'}</Text></Pressable>
-        </View>
+      {/* Pose suggestion (portrait mode only) */}
+      {showPose && faceDetected && (
+        <View style={st.poseCard}><View style={st.poseRow}><Text style={st.poseL}>Pose</Text><Pressable onPress={nextPose}><Text style={st.poseNext}>Next</Text></Pressable></View>
+          <Text style={st.poseN}>{currentPose.name}</Text><Text style={st.poseI}>{currentPose.instruction}</Text></View>
       )}
 
-      {/* Bottom section */}
-      <View style={st.botSection}>
-        {/* Zoom toggle */}
-        <View style={st.zoomRow}>
-          {ZOOM_LABELS.map((label, i) => (
-            <Pressable key={i} onPress={() => selectZoom(i)} style={[st.zoomPill, activeZoomIdx === i && st.zoomPillA]}>
-              <Text style={[st.zoomPillT, activeZoomIdx === i && st.zoomPillTA]}>{label}×</Text>
-            </Pressable>
-          ))}
+      {/* Shutter — large, centered */}
+      <View style={st.shutterArea}>
+        <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready}>
+          <Animated.View style={[st.shOuter, { transform: [{ scale: shutterAnim }] }]}><View style={st.shInner} /></Animated.View>
+        </Pressable>
+      </View>
+
+      {/* Bottom row: thumb + mode pill + flip */}
+      <View style={st.botRow}>
+        <Pressable onPress={onGallery} style={st.thumb}>{lastThumb ? <Image source={{ uri: lastThumb }} style={st.thumbImg} /> : <View style={st.thumbPh} />}</Pressable>
+        <View style={st.modePill}>
+          <Pressable onPress={() => { setFaceDetected(false); setShowPose(false); }} style={[st.modeOpt, !faceDetected && st.modeOptA]}><Text style={[st.modeOptT, !faceDetected && st.modeOptTA]}>PHOTO</Text></Pressable>
+          <Pressable onPress={() => { setFaceDetected(true); setShowPose(true); setCurrentPose(getRandomPose('portrait')); }} style={[st.modeOpt, faceDetected && st.modeOptA]}><Text style={[st.modeOptT, faceDetected && st.modeOptTA]}>PORTRAIT</Text></Pressable>
         </View>
-
-        {/* Pose suggestion (portrait mode only) */}
-        {showPose && faceDetected && (
-          <View style={st.poseCard}><View style={st.poseRow}><Text style={st.poseL}>Pose</Text><Pressable onPress={nextPose}><Text style={st.poseNext}>Next</Text></Pressable></View>
-            <Text style={st.poseN}>{currentPose.name}</Text><Text style={st.poseI}>{currentPose.instruction}</Text></View>
-        )}
-
-        {/* Filter strip */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll} style={st.filterArea}>
-          <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}><Text style={[st.fChipT, activeFilter === 'auto' && st.fChipTA]}>Auto</Text></Pressable>
-          {FILTERS.filter(f => f.id !== 'original').map(f => (
-            <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}><Text style={[st.fChipT, activeFilter === f.id && st.fChipTA]}>{f.name}</Text></Pressable>
-          ))}
-        </ScrollView>
-
-        {/* Mode selector */}
-        <View style={st.modeRow}>
-          <Pressable onPress={() => { setFaceDetected(false); setShowPose(false); }}><Text style={[st.modeT, !faceDetected && st.modeTOn]}>PHOTO</Text></Pressable>
-          <Pressable onPress={() => { setFaceDetected(true); setShowPose(true); setCurrentPose(getRandomPose('portrait')); }}><Text style={[st.modeT, faceDetected && st.modeTOn]}>PORTRAIT</Text></Pressable>
-        </View>
-
-        {/* Shutter row */}
-        <View style={st.ctrlRow}>
-          <Pressable onPress={onGallery} style={st.thumb}>{lastThumb ? <Image source={{ uri: lastThumb }} style={st.thumbImg} /> : <View style={st.thumbPh} />}</Pressable>
-          <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready}>
-            <Animated.View style={[st.shOuter, { transform: [{ scale: shutterAnim }] }]}><View style={st.shInner} /></Animated.View>
-          </Pressable>
-          <Pressable onPress={flip} style={st.flipBtn}><View style={st.flipIcon} /><View style={st.flipArrow} /></Pressable>
-        </View>
+        <Pressable onPress={flip} style={st.flipBtn}><View style={st.flipIcon} /></Pressable>
       </View>
 
       {err.length > 0 && <View style={st.toast}><Text style={st.toastT}>{err}</Text></View>}
@@ -228,10 +221,39 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
 const st = StyleSheet.create({
   bg: { flex: 1, backgroundColor: '#000' },
+  // Top row
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
+  topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  evText: { color: '#fff', fontSize: 13, fontWeight: '500' },
+  formatBadge: { backgroundColor: '#2c2c2e', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14 },
+  formatT: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2c2c2e', borderRadius: 18, paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
+  trBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  trIcon: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' },
+  trIconOn: { borderColor: '#FFD60A', borderTopColor: 'transparent' },
+  flashBar: { width: 3, height: 14, borderRadius: 1.5, backgroundColor: '#fff' },
+  flashBarOn: { backgroundColor: '#FFD60A' },
+  flashA: { color: '#FFD60A', fontSize: 8, fontWeight: '700', position: 'absolute', bottom: 2 },
+  timerDot: { width: 6, height: 6, borderRadius: 3, borderWidth: 1.5, borderColor: '#fff' },
+  timerDotOn: { backgroundColor: '#FFD60A', borderColor: '#FFD60A' },
+  dots: { flexDirection: 'row', flexWrap: 'wrap', width: 18, gap: 2, justifyContent: 'center' },
+  d: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' },
+
+  // Settings panel
+  setPanel: { position: 'absolute', top: 100, left: 16, right: 16, zIndex: 20, backgroundColor: 'rgba(44,44,46,0.95)', borderRadius: 12, padding: 4, flexDirection: 'row', flexWrap: 'wrap' },
+  setItem: { width: '25%', paddingVertical: 10, alignItems: 'center' },
+  setL: { color: '#8e8e93', fontSize: 9, fontWeight: '500', marginBottom: 2 },
+  setV: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  setVOn: { color: '#FFD60A' },
+
+  // Viewfinder
   vfWrap: { flex: 1 },
   overlay: { ...StyleSheet.absoluteFillObject },
-  grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.2)' },
+  grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.25)' },
   guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)', borderStyle: 'dashed' },
+  crosshair: { position: 'absolute', top: '50%', left: '50%', marginTop: -10, marginLeft: -10, width: 20, height: 20 },
+  crossH: { position: 'absolute', top: 9, left: 0, right: 0, height: 1, backgroundColor: '#FFD60A' },
+  crossV: { position: 'absolute', left: 9, top: 0, bottom: 0, width: 1, backgroundColor: '#FFD60A' },
   expArea: { position: 'absolute', right: 20, top: '30%', width: 30, height: 100 },
   expTrack: { flex: 1, alignItems: 'center' }, expDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFD60A' },
   nightBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
@@ -239,55 +261,38 @@ const st = StyleSheet.create({
   countBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
   countN: { fontSize: 72, fontWeight: '100', color: '#fff' },
   flashOver: { ...StyleSheet.absoluteFillObject, backgroundColor: '#fff' },
-
-  // Top bar — absolute, minimal
-  topBar: { position: 'absolute', top: 52, left: 16, right: 16, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  topPill: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 2 },
-  flashBar: { width: 3, height: 12, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.7)' },
-  flashBarOn: { backgroundColor: '#FFD60A' },
-  flashA: { color: '#FFD60A', fontSize: 9, fontWeight: '700' },
-  timerBadge: { backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  timerT: { color: '#FFD60A', fontSize: 11, fontWeight: '600' },
-  dots: { flexDirection: 'row', gap: 3 }, d: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' },
-
-  // Settings panel — absolute below top bar
-  setPanel: { position: 'absolute', top: 96, left: 16, right: 16, zIndex: 10, backgroundColor: 'rgba(24,24,27,0.95)', borderRadius: 12, borderWidth: 1, borderColor: '#27272a', padding: 4, flexDirection: 'row', flexWrap: 'wrap' },
-  setItem: { width: '33%', paddingVertical: 10, alignItems: 'center' },
-  setL: { color: '#71717a', fontSize: 9, fontWeight: '500', marginBottom: 2 },
-  setV: { color: '#a1a1aa', fontSize: 12, fontWeight: '600' },
-  setVOn: { color: '#FFD60A' },
-
-  // Bottom section
-  botSection: { backgroundColor: '#000', paddingBottom: 30, gap: 8 },
-  zoomRow: { flexDirection: 'row', justifyContent: 'center', gap: 4, paddingVertical: 6 },
-  zoomPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)' },
-  zoomPillA: { backgroundColor: 'rgba(255,215,0,0.15)' },
-  zoomPillT: { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '700' },
+  // Zoom inside viewfinder bottom
+  zoomRow: { position: 'absolute', bottom: 16, alignSelf: 'center', flexDirection: 'row', gap: 4 },
+  zoomPill: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(50,50,50,0.7)', alignItems: 'center', justifyContent: 'center' },
+  zoomPillA: { backgroundColor: 'rgba(80,80,80,0.9)' },
+  zoomPillT: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700' },
   zoomPillTA: { color: '#FFD60A' },
-  poseCard: { marginHorizontal: 16, backgroundColor: '#18181b', borderRadius: 10, borderWidth: 1, borderColor: '#27272a', padding: 10 },
+
+  // Pose
+  poseCard: { marginHorizontal: 16, marginTop: 6, backgroundColor: '#1c1c1e', borderRadius: 10, padding: 10 },
   poseRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  poseL: { color: '#52525b', fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
-  poseNext: { color: '#a1a1aa', fontSize: 10 },
-  poseN: { color: '#fafafa', fontSize: 13, fontWeight: '600' },
-  poseI: { color: '#71717a', fontSize: 11, lineHeight: 15 },
-  filterArea: { maxHeight: 36 },
-  filterScroll: { paddingHorizontal: 12, gap: 5 },
-  fChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
-  fChipA: { backgroundColor: 'rgba(255,255,255,0.15)' },
-  fChipAuto: { backgroundColor: 'rgba(34,197,94,0.15)' },
-  fChipT: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600' },
-  fChipTA: { color: '#fafafa' },
-  modeRow: { flexDirection: 'row', justifyContent: 'center', gap: 28 },
-  modeT: { fontSize: 12, fontWeight: '600', letterSpacing: 1, color: 'rgba(255,255,255,0.3)' },
-  modeTOn: { color: '#FFD60A' },
-  ctrlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 24, paddingTop: 6 },
-  thumb: { width: 42, height: 42, borderRadius: 8, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
-  thumbImg: { width: '100%', height: '100%' }, thumbPh: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)' },
-  shOuter: { width: 68, height: 68, borderRadius: 34, borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  shInner: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#fff' },
-  flipBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  flipIcon: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#fff' },
-  flipArrow: { position: 'absolute', top: 8, right: 10, width: 5, height: 5, borderTopWidth: 1.5, borderRightWidth: 1.5, borderColor: '#fff', transform: [{ rotate: '45deg' }] },
-  toast: { position: 'absolute', top: 100, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 10, padding: 10 },
+  poseL: { color: '#8e8e93', fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
+  poseNext: { color: '#8e8e93', fontSize: 10 },
+  poseN: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  poseI: { color: '#8e8e93', fontSize: 11, lineHeight: 15 },
+
+  // Shutter area
+  shutterArea: { alignItems: 'center', paddingVertical: 14 },
+  shOuter: { width: 72, height: 72, borderRadius: 36, borderWidth: 5, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' },
+  shInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
+
+  // Bottom row
+  botRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, paddingBottom: 34 },
+  thumb: { width: 44, height: 44, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' },
+  thumbImg: { width: '100%', height: '100%' }, thumbPh: { flex: 1, backgroundColor: '#1c1c1e' },
+  modePill: { flexDirection: 'row', backgroundColor: '#2c2c2e', borderRadius: 16, padding: 3 },
+  modeOpt: { paddingVertical: 7, paddingHorizontal: 16, borderRadius: 14 },
+  modeOptA: { backgroundColor: '#3a3a3c' },
+  modeOptT: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
+  modeOptTA: { color: '#FFD60A' },
+  flipBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#2c2c2e', alignItems: 'center', justifyContent: 'center' },
+  flipIcon: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#fff' },
+
+  toast: { position: 'absolute', top: 110, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 10, padding: 10 },
   toastT: { color: '#fff', fontSize: 12, textAlign: 'center' },
 });
