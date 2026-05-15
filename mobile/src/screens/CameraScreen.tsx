@@ -146,8 +146,8 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Pressable onPress={cycleFormat} style={st.formatBadge}><Text style={st.formatT}>{format}</Text></Pressable>
         </View>
         <View style={st.topRight}>
-          <Pressable onPress={toggleNight} style={st.trBtn}><Text style={[st.trT, nightMode && st.trTOn]}>☾</Text>{nightMode && <Text style={st.trLabel}>On</Text>}</Pressable>
-          <Pressable onPress={cycleFlash} style={st.trBtn}><Text style={[st.trT, flashState !== 'off' && st.trTOn]}>⚡</Text><Text style={st.trLabel}>{flashState === 'auto' ? 'A' : flashState === 'on' ? 'On' : 'Off'}</Text></Pressable>
+          {lowLight && <Pressable onPress={toggleNight} style={st.trBtn}><View style={[st.moonShape, nightMode && st.moonOn]} />{nightMode && <Text style={st.trLabel}>On</Text>}</Pressable>}
+          <Pressable onPress={cycleFlash} style={st.trBtn}><View style={[st.boltShape, flashState !== 'off' && st.boltOn]} />{flashState !== 'off' && <Text style={st.trLabel}>{flashState === 'auto' ? 'A' : 'On'}</Text>}</Pressable>
           <Pressable onPress={cycleTimer} style={st.trBtn}><View style={[st.liveDot, timer > 0 && st.liveDotOn]}><View style={st.liveInner} /></View>{timer > 0 && <Text style={st.trLabel}>{timer}s</Text>}</Pressable>
           <Pressable onPress={() => setShowSettings(s => !s)} style={st.trBtn}><View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /></View></Pressable>
         </View>
@@ -237,9 +237,11 @@ const st = StyleSheet.create({
   formatT: { color: '#fff', fontSize: 11, fontWeight: '600' },
   topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1c1c1e', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 4, gap: 2 },
   trBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  trT: { color: '#fff', fontSize: 16 },
-  trTOn: { color: '#FFD60A' },
-  trLabel: { color: '#FFD60A', fontSize: 7, fontWeight: '700', marginTop: -2 },
+  boltShape: { width: 4, height: 14, backgroundColor: '#fff', borderRadius: 1, transform: [{ skewX: '-8deg' }] },
+  boltOn: { backgroundColor: '#FFD60A' },
+  moonShape: { width: 14, height: 14, borderRadius: 7, borderWidth: 2.5, borderColor: '#fff', borderRightColor: 'transparent' },
+  moonOn: { borderColor: '#FFD60A', borderRightColor: 'transparent' },
+  trLabel: { color: '#FFD60A', fontSize: 7, fontWeight: '700', marginTop: -1 },
   liveDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   liveDotOn: { borderColor: '#FFD60A' },
   liveInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
