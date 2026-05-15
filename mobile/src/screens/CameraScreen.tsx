@@ -146,9 +146,9 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Pressable onPress={cycleFormat} style={st.formatBadge}><Text style={st.formatT}>{format}</Text></Pressable>
         </View>
         <View style={st.topRight}>
-          <Pressable onPress={toggleNight} style={st.trBtn}><Text style={[st.trT, nightMode && st.trTOn]}>☾</Text></Pressable>
-          <Pressable onPress={cycleFlash} style={st.trBtn}><Text style={[st.trT, flashState !== 'off' && st.trTOn]}>↯</Text></Pressable>
-          <Pressable onPress={cycleTimer} style={st.trBtn}><View style={[st.liveDot, timer > 0 && st.liveDotOn]}><View style={st.liveInner} /></View></Pressable>
+          <Pressable onPress={toggleNight} style={st.trBtn}><Text style={[st.trT, nightMode && st.trTOn]}>☾</Text>{nightMode && <Text style={st.trLabel}>On</Text>}</Pressable>
+          <Pressable onPress={cycleFlash} style={st.trBtn}><Text style={[st.trT, flashState !== 'off' && st.trTOn]}>⚡</Text><Text style={st.trLabel}>{flashState === 'auto' ? 'A' : flashState === 'on' ? 'On' : 'Off'}</Text></Pressable>
+          <Pressable onPress={cycleTimer} style={st.trBtn}><View style={[st.liveDot, timer > 0 && st.liveDotOn]}><View style={st.liveInner} /></View>{timer > 0 && <Text style={st.trLabel}>{timer}s</Text>}</Pressable>
           <Pressable onPress={() => setShowSettings(s => !s)} style={st.trBtn}><View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /><View style={st.d} /></View></Pressable>
         </View>
       </View>
@@ -218,7 +218,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
           <Pressable onPress={() => { setFaceDetected(false); setShowPose(false); }} style={[st.modeOpt, !faceDetected && st.modeOptA]}><Text style={[st.modeOptT, !faceDetected && st.modeOptTA]}>PHOTO</Text></Pressable>
           <Pressable onPress={() => { setFaceDetected(true); setShowPose(true); setCurrentPose(getRandomPose('portrait')); }} style={[st.modeOpt, faceDetected && st.modeOptA]}><Text style={[st.modeOptT, faceDetected && st.modeOptTA]}>PORTRAIT</Text></Pressable>
         </View>
-        <Pressable onPress={flip} style={st.flipBtn}><Text style={st.flipT}>⟳</Text></Pressable>
+        <Pressable onPress={flip} style={st.flipBtn}><View style={st.flipCircle}><View style={st.flipArrow1} /><View style={st.flipArrow2} /></View></Pressable>
       </View>
 
       {err.length > 0 && <View style={st.toast}><Text style={st.toastT}>{err}</Text></View>}
@@ -228,85 +228,87 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
 
 const st = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#000' },
+  bg: { flex: 1, backgroundColor: '#0c0c0c' },
   // Top row
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 10 },
   topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  evText: { color: '#fff', fontSize: 13, fontWeight: '500' },
-  formatBadge: { backgroundColor: '#2c2c2e', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14 },
-  formatT: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2c2c2e', borderRadius: 18, paddingHorizontal: 4, paddingVertical: 4, gap: 2 },
-  trBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  trT: { color: '#fff', fontSize: 18 },
+  evText: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '500' },
+  formatBadge: { backgroundColor: '#1c1c1e', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14 },
+  formatT: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  topRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1c1c1e', borderRadius: 20, paddingHorizontal: 6, paddingVertical: 4, gap: 2 },
+  trBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  trT: { color: '#fff', fontSize: 16 },
   trTOn: { color: '#FFD60A' },
-  liveDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  trLabel: { color: '#FFD60A', fontSize: 7, fontWeight: '700', marginTop: -2 },
+  liveDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   liveDotOn: { borderColor: '#FFD60A' },
-  liveInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
-  dots: { flexDirection: 'row', flexWrap: 'wrap', width: 18, gap: 2, justifyContent: 'center' },
-  d: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#fff' },
+  liveInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  dots: { flexDirection: 'row', flexWrap: 'wrap', width: 16, gap: 2, justifyContent: 'center' },
+  d: { width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#fff' },
 
   // Settings panel
-  setPanel: { position: 'absolute', top: 100, left: 16, right: 16, zIndex: 20, backgroundColor: 'rgba(44,44,46,0.95)', borderRadius: 12, padding: 4, flexDirection: 'row', flexWrap: 'wrap' },
+  setPanel: { position: 'absolute', top: 102, left: 16, right: 16, zIndex: 20, backgroundColor: '#1c1c1e', borderRadius: 14, padding: 6, flexDirection: 'row', flexWrap: 'wrap' },
   setItem: { width: '25%', paddingVertical: 10, alignItems: 'center' },
-  setL: { color: '#8e8e93', fontSize: 9, fontWeight: '500', marginBottom: 2 },
-  setV: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  setL: { color: '#636366', fontSize: 9, fontWeight: '500', marginBottom: 2 },
+  setV: { color: '#fff', fontSize: 11, fontWeight: '600' },
   setVOn: { color: '#FFD60A' },
 
-  // Viewfinder
-  vfWrap: { flex: 1 },
+  // Viewfinder — Bevel style with rounded corners
+  vfWrap: { flex: 1, marginHorizontal: 6, borderRadius: 16, overflow: 'hidden' },
   overlay: { ...StyleSheet.absoluteFillObject },
-  grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.25)' },
-  guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.35)', borderStyle: 'dashed' },
+  grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.2)' },
+  guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' },
   crosshair: { position: 'absolute', top: '50%', left: '50%', marginTop: -10, marginLeft: -10, width: 20, height: 20 },
   crossH: { position: 'absolute', top: 9, left: 0, right: 0, height: 1, backgroundColor: '#FFD60A' },
   crossV: { position: 'absolute', left: 9, top: 0, bottom: 0, width: 1, backgroundColor: '#FFD60A' },
   expArea: { position: 'absolute', right: 20, top: '30%', width: 30, height: 100 },
   expTrack: { flex: 1, alignItems: 'center' }, expDot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFD60A' },
-  nightBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  nightBadge: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   nightT: { color: '#FFD60A', fontSize: 10, fontWeight: '700' },
   countBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
   countN: { fontSize: 72, fontWeight: '100', color: '#fff' },
   flashOver: { ...StyleSheet.absoluteFillObject, backgroundColor: '#fff' },
-  // Zoom inside viewfinder bottom
-  zoomRow: { position: 'absolute', bottom: 16, alignSelf: 'center', flexDirection: 'row', gap: 4 },
-  zoomPill: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(50,50,50,0.7)', alignItems: 'center', justifyContent: 'center' },
-  zoomPillA: { backgroundColor: 'rgba(80,80,80,0.9)' },
-  zoomPillT: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700' },
+  zoomRow: { position: 'absolute', bottom: 14, alignSelf: 'center', flexDirection: 'row', gap: 4 },
+  zoomPill: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(28,28,30,0.8)', alignItems: 'center', justifyContent: 'center' },
+  zoomPillA: { backgroundColor: 'rgba(60,60,62,0.9)' },
+  zoomPillT: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700' },
   zoomPillTA: { color: '#FFD60A' },
 
   // Pose
-  poseCard: { marginHorizontal: 16, marginTop: 6, backgroundColor: '#1c1c1e', borderRadius: 10, padding: 10 },
+  poseCard: { marginHorizontal: 16, marginTop: 8, backgroundColor: '#1c1c1e', borderRadius: 12, padding: 10 },
   poseRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  poseL: { color: '#8e8e93', fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
-  poseNext: { color: '#8e8e93', fontSize: 10 },
+  poseL: { color: '#636366', fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
+  poseNext: { color: '#636366', fontSize: 10 },
   poseN: { color: '#fff', fontSize: 13, fontWeight: '600' },
   poseI: { color: '#8e8e93', fontSize: 11, lineHeight: 15 },
 
-  // Shutter area
-  shutterArea: { alignItems: 'center', paddingVertical: 14 },
-  shOuter: { width: 72, height: 72, borderRadius: 36, borderWidth: 5, borderColor: 'rgba(255,255,255,0.4)', alignItems: 'center', justifyContent: 'center' },
-  shInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
-
-  // Bottom row
-  botRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 32, paddingBottom: 34 },
-  thumb: { width: 44, height: 44, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)' },
-  thumbImg: { width: '100%', height: '100%' }, thumbPh: { flex: 1, backgroundColor: '#1c1c1e' },
-  modePill: { flexDirection: 'row', backgroundColor: '#2c2c2e', borderRadius: 16, padding: 3 },
-  modeOpt: { paddingVertical: 7, paddingHorizontal: 16, borderRadius: 14 },
-  modeOptA: { backgroundColor: '#3a3a3c' },
-  modeOptT: { color: '#8e8e93', fontSize: 12, fontWeight: '600' },
-  modeOptTA: { color: '#FFD60A' },
-  flipBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#2c2c2e', alignItems: 'center', justifyContent: 'center' },
-  flipT: { color: '#fff', fontSize: 22 },
-
   // Filter strip
-  filterArea: { maxHeight: 34, marginBottom: 4 },
+  filterArea: { maxHeight: 34, marginTop: 6 },
   filterScroll: { paddingHorizontal: 12, gap: 5 },
-  fChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
-  fChipA: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  fChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: '#1c1c1e' },
+  fChipA: { backgroundColor: '#3a3a3c' },
   fChipAuto: { backgroundColor: 'rgba(34,197,94,0.15)' },
   fChipT: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600' },
   fChipTA: { color: '#fff' },
+
+  // Shutter area
+  shutterArea: { alignItems: 'center', paddingVertical: 12 },
+  shOuter: { width: 72, height: 72, borderRadius: 36, borderWidth: 5, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
+  shInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#fff' },
+
+  // Bottom row
+  botRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingBottom: 36 },
+  thumb: { width: 44, height: 44, borderRadius: 10, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)' },
+  thumbImg: { width: '100%', height: '100%' }, thumbPh: { flex: 1, backgroundColor: '#1c1c1e' },
+  modePill: { flexDirection: 'row', backgroundColor: '#1c1c1e', borderRadius: 16, padding: 3 },
+  modeOpt: { paddingVertical: 7, paddingHorizontal: 18, borderRadius: 14 },
+  modeOptA: { backgroundColor: '#3a3a3c' },
+  modeOptT: { color: '#636366', fontSize: 12, fontWeight: '600' },
+  modeOptTA: { color: '#FFD60A' },
+  flipBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1c1c1e', alignItems: 'center', justifyContent: 'center' },
+  flipCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  flipArrow1: { position: 'absolute', top: -1, right: 2, width: 0, height: 0, borderLeftWidth: 3, borderRightWidth: 3, borderBottomWidth: 5, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fff' },
+  flipArrow2: { position: 'absolute', bottom: -1, left: 2, width: 0, height: 0, borderLeftWidth: 3, borderRightWidth: 3, borderTopWidth: 5, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fff' },
 
   toast: { position: 'absolute', top: 110, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 10, padding: 10 },
   toastT: { color: '#fff', fontSize: 12, textAlign: 'center' },
