@@ -206,7 +206,10 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
 
       {/* Filter strip — Auto (AI grading) + manual presets with color dots */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll} style={st.filterArea}>
-        <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}><Text style={[st.fChipT, activeFilter === 'auto' && st.fChipTA]}>Auto</Text></Pressable>
+        <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}>
+          <View style={[st.fDot, { backgroundColor: '#22c55e' }]} />
+          <Text style={[st.fChipT, activeFilter === 'auto' && st.fChipTA]}>Auto</Text>
+        </Pressable>
         {FILTERS.filter(f => f.id !== 'original').map(f => (
           <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}>
             <View style={[st.fDot, { backgroundColor: f.style.overlayColor || (f.id === 'bw' ? '#808080' : '#fff') }]} />
