@@ -17,6 +17,17 @@ export async function gradePhoto(uri: string): Promise<{ gradedUri: string; pres
   return { gradedUri, presetId, presetName };
 }
 
+export async function guideComposition(uri: string): Promise<{ instructions: string[]; compositionTip: string }> {
+  const response = await fetch(`${API_BASE_URL}/guide`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: await fetch(uri).then(r => r.blob()),
+  });
+  if (!response.ok) throw new Error(`Guide failed: ${response.status}`);
+  const data = await response.json();
+  return { instructions: data.instructions ?? [], compositionTip: data.composition_tip ?? '' };
+}
+
 export async function uploadFile(
   file: SelectedFile,
   onProgress: (pct: number) => void,

@@ -332,7 +332,7 @@ def health_check() -> HealthResponse:
 
 
 @app.post("/grade", tags=["grading"])
-def grade_photo(
+async def grade_photo(
     request: Request,
     payload: bytes = Body(
         ...,
@@ -341,26 +341,106 @@ def grade_photo(
         max_length=MAX_UPLOAD_BYTES,
     ),
 ):
-    from grading import grade_image
+    from grading import grade_image, apply_grade, PRESETS
+    from ai import get_provider
+    import os
+
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type and content_type != "application/octet-stream":
+        raise HTTPException(status_code=415, detail="content-type must be application/octet-stream")
+
+    # Try AI-powered grading first, fall back to preset-based
+    if os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY"):
+        try:
+            provider = get_provider()
+            result = await provider.grade_photo(payload)
+            # Apply AI-determined values using grading engine
+            from PIL import Image, ImageEnhance
+            from io import BytesIO
+            import numpy as np
+
+            img = Image.open(BytesIO(payload)).convert("RGB")
+            arr = np.array(img, dtype=np.float32)
+
+            # Exposure
+            arr = arr * (2 ** result.exposure)
+            # Temperature (warm/cool shift)
+            arr[:, :, 0] += result.temperature * 0.5
+            arr[:, :, 2] -= result.temperature * 0.5
+            # Contrast
+            arr = (arr - 128) * (1 + result.contrast / 100) + 128
+            # Shadows (lift darks)
+            shadow_mask = (1.0 - arr / 255.0) ** 2
+            arr += shadow_mask * result.shadows * 0.3
+            # Highlights (pull brights)
+            hl_mask = (arr / 255.0) ** 2
+            arr -= hl_mask * result.highlights * 0.3
+
+            arr = np.clip(arr, 0, 255).astype(np.uint8)
+            img = Image.fromarray(arr)
+
+            # Saturation + Vibrance
+            if result.saturation != 0:
+                img = ImageEnhance.Color(img).enhance(1 + result.saturation / 100)
+            # Grain
+            if result.grain > 0:
+                arr2 = np.array(img, dtype=np.float32)
+                noise = np.random.normal(0, result.grain, arr2.shape)
+                arr2 = np.clip(arr2 + noise, 0, 255).astype(np.uint8)
+                img = Image.fromarray(arr2)
+            # Vignette
+            if result.vignette > 0:
+                arr3 = np.array(img, dtype=np.float32)
+                h, w = arr3.shape[:2]
+                y, x = np.ogrid[:h, :w]
+                dist = np.sqrt((x - w/2)**2 + (y - h/2)**2)
+                v = 1.0 - (result.vignette / 100) * (dist / np.sqrt((w/2)**2 + (h/2)**2))**2
+                arr3 = np.clip(arr3 * v[:, :, np.newaxis], 0, 255).astype(np.uint8)
+                img = Image.fromarray(arr3)
+
+            output = BytesIO()
+            img.save(output, format="JPEG", quality=92)
+            from fastapi.responses import Response
+            return Response(content=output.getvalue(), media_type="image/jpeg", headers={"X-Grade-Preset-Id": "ai", "X-Grade-Preset-Name": result.style_name})
+        except Exception:
+            pass  # Fall through to preset-based grading
+
+    # Fallback: preset-based grading
+    try:
+        graded_bytes, preset_id, preset_name = grade_image(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not process image: {exc}")
+
     from fastapi.responses import Response
+    return Response(content=graded_bytes, media_type="image/jpeg", headers={"X-Grade-Preset-Id": preset_id, "X-Grade-Preset-Name": preset_name})
+
+
+@app.post("/guide", tags=["guidance"])
+async def guide_composition(
+    request: Request,
+    payload: bytes = Body(
+        ...,
+        media_type="application/octet-stream",
+        min_length=1,
+        max_length=MAX_UPLOAD_BYTES,
+    ),
+):
+    from ai import get_provider
+    import os
+
+    if not (os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY")):
+        raise HTTPException(status_code=503, detail="AI not configured. Set GOOGLE_AI_API_KEY in .env")
 
     content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if content_type and content_type != "application/octet-stream":
         raise HTTPException(status_code=415, detail="content-type must be application/octet-stream")
 
     try:
-        graded_bytes, preset_id, preset_name = grade_image(payload)
+        provider = get_provider()
+        result = await provider.guide_composition(payload)
+        return {"instructions": result.instructions, "composition_tip": result.composition_tip}
     except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Could not process image: {exc}")
-
-    return Response(
-        content=graded_bytes,
-        media_type="image/jpeg",
-        headers={
-            "X-Grade-Preset-Id": preset_id,
-            "X-Grade-Preset-Name": preset_name,
-        },
-    )
+        raise HTTPException(status_code=422, detail=f"Guide failed: {exc}")
 
 
 @app.post("/uploads/init", response_model=UploadInitResponse, tags=["uploads"])

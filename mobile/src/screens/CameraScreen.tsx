@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { FILTERS, type FilterId } from '../filters';
 import { pickBestFilter } from '../autoFilter';
 import { getRandomPose, type PoseSuggestion } from '../poses';
+import { guideComposition } from '../services/api';
 import type { CaptureMode, SelectedFile } from '../types';
 
 const { width: W, height: H } = Dimensions.get('window');
@@ -47,6 +48,8 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   const [faceDetected, setFaceDetected] = useState(false);
   const [currentPose, setCurrentPose] = useState<PoseSuggestion>(getRandomPose('portrait'));
   const [showPose, setShowPose] = useState(false);
+  const [aiGuide, setAiGuide] = useState<{ instructions: string[]; tip: string } | null>(null);
+  const [guideLoading, setGuideLoading] = useState(false);
   const [err, setErr] = useState('');
   const cam = useRef<CameraView>(null);
   const shutterAnim = useRef(new Animated.Value(1)).current;
@@ -81,6 +84,19 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   const toggleGrid = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowGrid(g => !g); }, []);
   const toggleGuide = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFaceDetected(f => !f); setShowPose(p => !p); if (!showPose) setCurrentPose(getRandomPose('portrait')); }, [showPose]);
   const nextPose = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCurrentPose(getRandomPose('portrait')); }, []);
+
+  const requestAiGuide = useCallback(async () => {
+    if (!cam.current || !ready) return;
+    setGuideLoading(true);
+    try {
+      const snap = await cam.current.takePictureAsync({ quality: 0.4 });
+      if (!snap?.uri) return;
+      const result = await guideComposition(snap.uri);
+      setAiGuide({ instructions: result.instructions, tip: result.compositionTip });
+    } catch {
+      setAiGuide(null);
+    } finally { setGuideLoading(false); }
+  }, [ready]);
 
   const selectZoom = useCallback((idx: number) => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveZoomIdx(idx); setZoom(ZOOM_LEVELS[idx]); }, []);
 
@@ -198,10 +214,24 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
         </Pressable>
       </View>
 
-      {/* Pose suggestion (portrait mode only) */}
+      {/* AI Guide (portrait mode) */}
       {showPose && faceDetected && (
-        <View style={st.poseCard}><View style={st.poseRow}><Text style={st.poseL}>Pose</Text><Pressable onPress={nextPose}><Text style={st.poseNext}>Next</Text></Pressable></View>
-          <Text style={st.poseN}>{currentPose.name}</Text><Text style={st.poseI}>{currentPose.instruction}</Text></View>
+        <View style={st.poseCard}>
+          {aiGuide ? (
+            <>
+              {aiGuide.instructions.map((instr, i) => <Text key={i} style={st.poseN}>{instr}</Text>)}
+              {aiGuide.tip ? <Text style={st.poseI}>{aiGuide.tip}</Text> : null}
+              <Pressable onPress={requestAiGuide} style={st.guideBtn}><Text style={st.guideBtnT}>{guideLoading ? 'Analyzing...' : 'Refresh'}</Text></Pressable>
+            </>
+          ) : (
+            <>
+              <View style={st.poseRow}><Text style={st.poseL}>Pose</Text><Pressable onPress={nextPose}><Text style={st.poseNext}>Next</Text></Pressable></View>
+              <Text style={st.poseN}>{currentPose.name}</Text>
+              <Text style={st.poseI}>{currentPose.instruction}</Text>
+              <Pressable onPress={requestAiGuide} style={st.guideBtn}><Text style={st.guideBtnT}>{guideLoading ? 'Analyzing...' : 'AI Guide Me'}</Text></Pressable>
+            </>
+          )}
+        </View>
       )}
 
       {/* Filter strip — Auto (AI grading) + manual presets with color dots */}
@@ -291,6 +321,8 @@ const st = StyleSheet.create({
   poseNext: { color: '#636366', fontSize: 10 },
   poseN: { color: '#fff', fontSize: 13, fontWeight: '600' },
   poseI: { color: '#8e8e93', fontSize: 11, lineHeight: 15 },
+  guideBtn: { marginTop: 8, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 14, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)' },
+  guideBtnT: { color: '#FFD60A', fontSize: 11, fontWeight: '600' },
 
   // Filter strip
   filterArea: { maxHeight: 34, marginTop: 6 },
