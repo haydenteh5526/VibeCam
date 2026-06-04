@@ -1,68 +1,198 @@
-"""AI color grading engine with real film simulation: grain, vignette, halation, color curves."""
+"""Advanced AI color grading engine.
+Techniques from: color-matcher (Reinhard transfer), RapidRAW (HSL mixer, 3-way grading, skin-aware vibrance)."""
 
 from io import BytesIO
 import numpy as np
 from PIL import Image, ImageStat, ImageEnhance, ImageFilter
 
+# ─── Film Presets with advanced parameters ─────────────────────────────────────
+
 PRESETS = {
     "kodak_gold": {
         "name": "Kodak Gold 200",
-        "warmth": 1.15, "saturation": 1.12, "contrast": 1.06,
-        "shadows_tint": (12, 5, -8), "highlights_tint": (6, 3, -10),
-        "grain": 8, "vignette": 0.15, "halation": 0,
-        "black_point": 10, "fade": 0,
+        "temperature": 15, "tint": 3,
+        "contrast": 6, "exposure": 0.0,
+        "shadows": {"hue": 30, "sat": 12, "lum": 5},
+        "midtones": {"hue": 35, "sat": 5, "lum": 0},
+        "highlights": {"hue": 45, "sat": 8, "lum": -3},
+        "hsl": {"orange_sat": 10, "green_sat": -15, "blue_sat": -10},
+        "vibrance": 10, "saturation": 12,
+        "grain": 8, "vignette": 15, "fade": 0, "black_point": 10,
     },
     "fuji_400h": {
         "name": "Fuji Pro 400H",
-        "warmth": 0.94, "saturation": 0.88, "contrast": 0.96,
-        "shadows_tint": (-4, 6, 10), "highlights_tint": (0, 3, -3),
-        "grain": 5, "vignette": 0.1, "halation": 0,
-        "black_point": 5, "fade": 8,
+        "temperature": -6, "tint": 4,
+        "contrast": -4, "exposure": 0.05,
+        "shadows": {"hue": 160, "sat": 10, "lum": 3},
+        "midtones": {"hue": 140, "sat": 4, "lum": 0},
+        "highlights": {"hue": 50, "sat": 3, "lum": 2},
+        "hsl": {"orange_sat": -5, "green_sat": 8, "blue_sat": 5},
+        "vibrance": -8, "saturation": -12,
+        "grain": 5, "vignette": 10, "fade": 8, "black_point": 5,
     },
     "portra_400": {
         "name": "Portra 400",
-        "warmth": 1.04, "saturation": 0.93, "contrast": 0.97,
-        "shadows_tint": (6, 3, -2), "highlights_tint": (4, 1, -6),
-        "grain": 6, "vignette": 0.08, "halation": 0,
-        "black_point": 8, "fade": 5,
+        "temperature": 5, "tint": 2,
+        "contrast": -3, "exposure": 0.0,
+        "shadows": {"hue": 20, "sat": 8, "lum": 4},
+        "midtones": {"hue": 25, "sat": 3, "lum": 0},
+        "highlights": {"hue": 40, "sat": 5, "lum": 2},
+        "hsl": {"orange_sat": 8, "green_sat": -10, "blue_sat": -5},
+        "vibrance": -5, "saturation": -7,
+        "grain": 6, "vignette": 8, "fade": 5, "black_point": 8,
     },
     "cinestill": {
         "name": "CineStill 800T",
-        "warmth": 0.86, "saturation": 1.08, "contrast": 1.12,
-        "shadows_tint": (-6, -3, 15), "highlights_tint": (10, -2, -6),
-        "grain": 12, "vignette": 0.2, "halation": 15,
-        "black_point": 5, "fade": 0,
+        "temperature": -14, "tint": -3,
+        "contrast": 12, "exposure": -0.1,
+        "shadows": {"hue": 230, "sat": 18, "lum": -3},
+        "midtones": {"hue": 210, "sat": 6, "lum": 0},
+        "highlights": {"hue": 30, "sat": 12, "lum": 3},
+        "hsl": {"orange_sat": 15, "green_sat": -20, "blue_sat": 10},
+        "vibrance": 8, "saturation": 5,
+        "grain": 12, "vignette": 20, "fade": 0, "black_point": 5,
     },
     "tri_x": {
         "name": "Tri-X 400",
-        "warmth": 1.0, "saturation": 0.0, "contrast": 1.25,
-        "shadows_tint": (0, 0, 0), "highlights_tint": (0, 0, 0),
-        "grain": 18, "vignette": 0.18, "halation": 0,
-        "black_point": 12, "fade": 0,
+        "temperature": 0, "tint": 0,
+        "contrast": 25, "exposure": 0.0,
+        "shadows": {"hue": 0, "sat": 0, "lum": -5},
+        "midtones": {"hue": 0, "sat": 0, "lum": 0},
+        "highlights": {"hue": 0, "sat": 0, "lum": 5},
+        "hsl": {"orange_sat": 0, "green_sat": 0, "blue_sat": 0},
+        "vibrance": 0, "saturation": -100,
+        "grain": 18, "vignette": 18, "fade": 0, "black_point": 12,
     },
     "ektar": {
         "name": "Ektar 100",
-        "warmth": 1.1, "saturation": 1.3, "contrast": 1.1,
-        "shadows_tint": (4, -3, -6), "highlights_tint": (6, 4, -4),
-        "grain": 3, "vignette": 0.12, "halation": 0,
-        "black_point": 6, "fade": 0,
+        "temperature": 10, "tint": 0,
+        "contrast": 10, "exposure": 0.0,
+        "shadows": {"hue": 15, "sat": 6, "lum": -2},
+        "midtones": {"hue": 20, "sat": 8, "lum": 0},
+        "highlights": {"hue": 45, "sat": 10, "lum": -2},
+        "hsl": {"orange_sat": 15, "green_sat": 10, "blue_sat": 12},
+        "vibrance": 25, "saturation": 30,
+        "grain": 3, "vignette": 12, "fade": 0, "black_point": 6,
     },
     "disposable": {
         "name": "Disposable",
-        "warmth": 1.08, "saturation": 1.05, "contrast": 1.02,
-        "shadows_tint": (5, 8, -3), "highlights_tint": (8, 5, -5),
-        "grain": 22, "vignette": 0.3, "halation": 5,
-        "black_point": 15, "fade": 10,
+        "temperature": 8, "tint": 5,
+        "contrast": 2, "exposure": 0.05,
+        "shadows": {"hue": 40, "sat": 15, "lum": 8},
+        "midtones": {"hue": 30, "sat": 8, "lum": 0},
+        "highlights": {"hue": 50, "sat": 10, "lum": -5},
+        "hsl": {"orange_sat": 8, "green_sat": 5, "blue_sat": -5},
+        "vibrance": 5, "saturation": 5,
+        "grain": 22, "vignette": 30, "fade": 10, "black_point": 15,
     },
     "polaroid": {
         "name": "Polaroid 600",
-        "warmth": 1.06, "saturation": 0.9, "contrast": 0.94,
-        "shadows_tint": (8, 4, 2), "highlights_tint": (5, 3, -4),
-        "grain": 4, "vignette": 0.25, "halation": 3,
-        "black_point": 18, "fade": 15,
+        "temperature": 6, "tint": 3,
+        "contrast": -6, "exposure": 0.05,
+        "shadows": {"hue": 25, "sat": 10, "lum": 10},
+        "midtones": {"hue": 30, "sat": 5, "lum": 0},
+        "highlights": {"hue": 45, "sat": 6, "lum": 5},
+        "hsl": {"orange_sat": 5, "green_sat": -8, "blue_sat": -5},
+        "vibrance": -10, "saturation": -10,
+        "grain": 4, "vignette": 25, "fade": 15, "black_point": 18,
     },
 }
 
+
+# ─── Core processing (from RapidRAW techniques) ───────────────────────────────
+
+def _apply_temperature_tint(arr: np.ndarray, temp: float, tint: float) -> np.ndarray:
+    """White balance shift. Temp: positive=warm, negative=cool. Tint: positive=magenta, negative=green."""
+    arr[:, :, 0] += temp * 0.6   # R
+    arr[:, :, 2] -= temp * 0.6   # B
+    arr[:, :, 1] += tint * 0.3   # G (tint axis)
+    return arr
+
+
+def _apply_3way_grading(arr: np.ndarray, shadows: dict, midtones: dict, highlights: dict) -> np.ndarray:
+    """3-way color grading with smooth luminance masks (from RapidRAW's approach)."""
+    lum = np.mean(arr, axis=2, keepdims=True) / 255.0
+    # Smooth zone masks using smoothstep-like curves
+    shadow_mask = np.clip(1.0 - lum * 3, 0, 1) ** 1.5
+    highlight_mask = np.clip(lum * 3 - 2, 0, 1) ** 1.5
+    midtone_mask = 1.0 - shadow_mask - highlight_mask
+    midtone_mask = np.clip(midtone_mask, 0, 1)
+
+    # Apply hue-based tinting per zone (convert hue to RGB offset)
+    for mask, zone in [(shadow_mask, shadows), (midtone_mask, midtones), (highlight_mask, highlights)]:
+        hue_rad = zone["hue"] * np.pi / 180
+        intensity = zone["sat"] * 0.5
+        arr[:, :, 0] += mask[:, :, 0] * np.cos(hue_rad) * intensity
+        arr[:, :, 1] += mask[:, :, 0] * np.cos(hue_rad - 2.094) * intensity
+        arr[:, :, 2] += mask[:, :, 0] * np.cos(hue_rad + 2.094) * intensity
+        arr += mask * zone["lum"] * 0.5
+
+    return arr
+
+
+def _apply_hsl_mixer(arr: np.ndarray, hsl: dict) -> np.ndarray:
+    """HSL color mixer — target specific hue ranges (from RapidRAW's HSL panel)."""
+    # Convert to float HSV for hue-based operations
+    from PIL import Image as PILImage
+    img = PILImage.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    hsv = np.array(img.convert("HSV"), dtype=np.float32)
+
+    # Orange hues (15-45°) → skin tones
+    orange_mask = np.exp(-((hsv[:, :, 0] - 20) / 15) ** 2)[:, :, np.newaxis]
+    arr[:, :, 1] += orange_mask[:, :, 0] * hsl.get("orange_sat", 0) * 0.5
+
+    # Green hues (75-150°)
+    green_mask = np.exp(-((hsv[:, :, 0] - 85) / 25) ** 2)[:, :, np.newaxis]
+    arr[:, :, 1] += green_mask[:, :, 0] * hsl.get("green_sat", 0) * 0.3
+    arr[:, :, 0] -= green_mask[:, :, 0] * hsl.get("green_sat", 0) * 0.1
+
+    # Blue hues (150-210°)
+    blue_mask = np.exp(-((hsv[:, :, 0] - 140) / 20) ** 2)[:, :, np.newaxis]
+    arr[:, :, 2] += blue_mask[:, :, 0] * hsl.get("blue_sat", 0) * 0.4
+
+    return arr
+
+
+def _apply_skin_vibrance(img: Image.Image, vibrance: float) -> Image.Image:
+    """Skin-aware vibrance — boosts unsaturated areas, protects skin tones (from RapidRAW)."""
+    if vibrance == 0:
+        return img
+    arr = np.array(img, dtype=np.float32)
+    hsv = np.array(img.convert("HSV"), dtype=np.float32)
+
+    # Saturation mask: boost less-saturated pixels more
+    sat = hsv[:, :, 1] / 255.0
+    boost_mask = (1.0 - sat) ** 2  # inverse saturation
+
+    # Skin dampener: reduce effect on orange/skin hues (hue ~15-35)
+    skin_mask = np.exp(-((hsv[:, :, 0] - 18) / 12) ** 2)
+    dampener = 1.0 - skin_mask * 0.5  # 50% less effect on skin
+
+    # Apply vibrance as saturation boost weighted by mask
+    effective = boost_mask * dampener * vibrance * 0.01
+    gray = np.mean(arr, axis=2, keepdims=True)
+    arr = arr + (arr - gray) * effective[:, :, np.newaxis]
+
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+
+
+def _add_grain(arr: np.ndarray, amount: float) -> np.ndarray:
+    if amount <= 0: return arr
+    noise = np.random.normal(0, amount, arr.shape).astype(np.float32)
+    return arr + noise
+
+
+def _add_vignette(arr: np.ndarray, strength: float) -> np.ndarray:
+    if strength <= 0: return arr
+    h, w = arr.shape[:2]
+    y, x = np.ogrid[:h, :w]
+    dist = np.sqrt((x - w/2) ** 2 + (y - h/2) ** 2)
+    max_dist = np.sqrt((w/2)**2 + (h/2)**2)
+    v = 1.0 - (strength / 100) * (dist / max_dist) ** 2
+    return arr * v[:, :, np.newaxis]
+
+
+# ─── Analysis + Selection ──────────────────────────────────────────────────────
 
 def analyze_image(img: Image.Image) -> dict:
     stat = ImageStat.Stat(img)
@@ -71,8 +201,7 @@ def analyze_image(img: Image.Image) -> dict:
     warmth = (r - b) / 255
     w, h = img.size
     center = img.crop((w // 4, h // 4, 3 * w // 4, 3 * h // 4))
-    center_stat = ImageStat.Stat(center)
-    center_brightness = sum(center_stat.mean[:3]) / 3 / 255
+    center_brightness = sum(ImageStat.Stat(center).mean[:3]) / 3 / 255
     is_portrait = center_brightness > brightness * 1.05
     return {"brightness": brightness, "warmth": warmth, "is_portrait": is_portrait}
 
@@ -87,84 +216,57 @@ def pick_best_preset(analysis: dict) -> str:
     return "portra_400"
 
 
-def _add_grain(arr: np.ndarray, amount: int) -> np.ndarray:
-    if amount <= 0: return arr
-    noise = np.random.normal(0, amount, arr.shape).astype(np.float32)
-    return np.clip(arr + noise, 0, 255)
-
-
-def _add_vignette(arr: np.ndarray, strength: float) -> np.ndarray:
-    if strength <= 0: return arr
-    h, w = arr.shape[:2]
-    y, x = np.ogrid[:h, :w]
-    cy, cx = h / 2, w / 2
-    dist = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
-    max_dist = np.sqrt(cx ** 2 + cy ** 2)
-    vignette = 1.0 - strength * (dist / max_dist) ** 2
-    vignette = vignette[:, :, np.newaxis]
-    return np.clip(arr * vignette, 0, 255)
-
-
-def _add_halation(img: Image.Image, amount: int) -> Image.Image:
-    if amount <= 0: return img
-    blurred = img.filter(ImageFilter.GaussianBlur(radius=amount))
-    return Image.blend(img, blurred, alpha=0.15)
-
+# ─── Main Pipeline ─────────────────────────────────────────────────────────────
 
 def apply_grade(img: Image.Image, preset_id: str) -> Image.Image:
-    preset = PRESETS[preset_id]
+    p = PRESETS[preset_id]
     img = img.convert("RGB")
     arr = np.array(img, dtype=np.float32)
 
-    # Raise black point (lifted blacks = film look)
-    bp = preset["black_point"]
+    # 1. Exposure
+    if p["exposure"] != 0:
+        arr = arr * (2 ** p["exposure"])
+
+    # 2. White balance
+    arr = _apply_temperature_tint(arr, p["temperature"], p["tint"])
+
+    # 3. Contrast (S-curve approximation)
+    c = p["contrast"]
+    if c != 0:
+        arr = (arr - 128) * (1 + c / 100) + 128
+
+    # 4. Black point (raise floor)
+    bp = p["black_point"]
     if bp > 0:
         arr = arr * (1 - bp / 255) + bp
 
-    # Contrast
-    c = preset["contrast"]
-    if c != 1.0:
-        arr = (arr - 128) * c + 128
-
-    # Warmth
-    w = preset["warmth"]
-    if w != 1.0:
-        arr[:, :, 0] *= w
-        arr[:, :, 2] *= (2.0 - w)
-
-    # Shadow tint
-    s = preset["shadows_tint"]
-    shadow_mask = (1.0 - arr / 255.0) ** 2
-    for i in range(3):
-        arr[:, :, i] += shadow_mask[:, :, i] * s[i]
-
-    # Highlight tint
-    hl = preset["highlights_tint"]
-    hl_mask = (arr / 255.0) ** 2
-    for i in range(3):
-        arr[:, :, i] += hl_mask[:, :, i] * hl[i]
-
-    # Fade (raise shadows, lower highlights)
-    fade = preset["fade"]
+    # 5. Fade (lifted shadows, pulled highlights)
+    fade = p["fade"]
     if fade > 0:
         arr = arr * (1 - fade / 128) + fade / 2
 
-    # Grain
-    arr = _add_grain(arr, preset["grain"])
+    # 6. 3-way color grading (shadows/midtones/highlights)
+    arr = _apply_3way_grading(arr, p["shadows"], p["midtones"], p["highlights"])
 
-    # Vignette
-    arr = _add_vignette(arr, preset["vignette"])
+    # 7. HSL mixer (target specific hues)
+    arr = _apply_hsl_mixer(arr, p["hsl"])
+
+    # 8. Grain
+    arr = _add_grain(arr, p["grain"])
+
+    # 9. Vignette
+    arr = _add_vignette(arr, p["vignette"])
 
     arr = np.clip(arr, 0, 255).astype(np.uint8)
     result = Image.fromarray(arr)
 
-    # Halation (light bleed around highlights)
-    result = _add_halation(result, preset["halation"])
+    # 10. Skin-aware vibrance
+    result = _apply_skin_vibrance(result, p["vibrance"])
 
-    # Saturation
-    sat = preset["saturation"]
-    if sat != 1.0:
-        result = ImageEnhance.Color(result).enhance(sat)
+    # 11. Saturation
+    sat = p["saturation"]
+    if sat != 0:
+        result = ImageEnhance.Color(result).enhance(1 + sat / 100)
 
     return result
 

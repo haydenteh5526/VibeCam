@@ -99,3 +99,6 @@ backend/data/
 
 # Tooling artifacts
 .vscode-test/
+
+# Reference repos (not part of project)
+references/
