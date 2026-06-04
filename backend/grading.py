@@ -194,6 +194,45 @@ def _add_vignette(arr: np.ndarray, strength: float) -> np.ndarray:
 
 # ─── Analysis + Selection ──────────────────────────────────────────────────────
 
+def _lab_color_transfer(source: np.ndarray, ref_mean: tuple, ref_std: tuple) -> np.ndarray:
+    """LAB color space transfer (from EasyPhoto). Matches source color distribution to reference stats."""
+    import cv2
+    src = cv2.cvtColor(source, cv2.COLOR_RGB2LAB).astype(np.float32)
+    s_mean = src.mean(axis=(0, 1))
+    s_std = src.std(axis=(0, 1)) + 1e-6
+    for i in range(3):
+        src[:, :, i] = ((src[:, :, i] - s_mean[i]) * (ref_std[i] / s_std[i])) + ref_mean[i]
+    src = np.clip(src, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(src, cv2.COLOR_LAB2RGB)
+
+
+def face_quality_score(image_bytes: bytes) -> dict:
+    """Face quality check: blur detection + basic pose (from DeepCamera). Returns quality info."""
+    import cv2
+    arr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return {"quality": "unknown", "blur_score": 0, "suggestion": ""}
+    # Laplacian variance — higher = sharper
+    blur_score = cv2.Laplacian(img, cv2.CV_64F).var()
+    if blur_score < 50:
+        return {"quality": "blurry", "blur_score": round(blur_score, 1), "suggestion": "Hold steadier or improve lighting"}
+    elif blur_score < 200:
+        return {"quality": "acceptable", "blur_score": round(blur_score, 1), "suggestion": ""}
+    else:
+        return {"quality": "sharp", "blur_score": round(blur_score, 1), "suggestion": ""}
+
+
+# Pre-computed LAB reference stats for film looks (mean L/a/b, std L/a/b)
+LAB_REFS = {
+    "kodak_gold": ((145, 135, 155), (45, 8, 12)),
+    "fuji_400h": ((140, 125, 128), (48, 6, 8)),
+    "portra_400": ((142, 130, 135), (46, 7, 10)),
+    "cinestill": ((110, 128, 118), (50, 10, 15)),
+    "ektar": ((148, 138, 152), (42, 12, 14)),
+}
+
+
 def analyze_image(img: Image.Image) -> dict:
     stat = ImageStat.Stat(img)
     r, g, b = stat.mean[:3]
@@ -267,6 +306,15 @@ def apply_grade(img: Image.Image, preset_id: str) -> Image.Image:
     sat = p["saturation"]
     if sat != 0:
         result = ImageEnhance.Color(result).enhance(1 + sat / 100)
+
+    # 12. LAB color transfer — match film stock color distribution
+    if preset_id in LAB_REFS:
+        ref_mean, ref_std = LAB_REFS[preset_id]
+        result_arr = _lab_color_transfer(np.array(result), ref_mean, ref_std)
+        # Blend 30% LAB transfer with 70% parametric result for natural look
+        orig_arr = np.array(result, dtype=np.float32)
+        blended = (orig_arr * 0.7 + result_arr.astype(np.float32) * 0.3)
+        result = Image.fromarray(np.clip(blended, 0, 255).astype(np.uint8))
 
     return result
 

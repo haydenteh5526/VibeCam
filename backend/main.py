@@ -415,6 +415,15 @@ async def grade_photo(
     return Response(content=graded_bytes, media_type="image/jpeg", headers={"X-Grade-Preset-Id": preset_id, "X-Grade-Preset-Name": preset_name})
 
 
+@app.post("/quality", tags=["guidance"])
+def check_quality(
+    payload: bytes = Body(..., media_type="application/octet-stream", min_length=1, max_length=MAX_UPLOAD_BYTES),
+):
+    """Check photo quality (blur detection). Returns quality score and suggestion."""
+    from grading import face_quality_score
+    return face_quality_score(payload)
+
+
 @app.post("/grade/vibe", tags=["grading"])
 async def grade_with_vibe(
     request: Request,
