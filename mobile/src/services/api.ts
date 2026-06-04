@@ -17,6 +17,21 @@ export async function gradePhoto(uri: string): Promise<{ gradedUri: string; pres
   return { gradedUri, presetId, presetName };
 }
 
+
+export async function gradeWithVibe(uri: string, vibe: string): Promise<{ gradedUri: string; styleName: string }> {
+  const response = await fetch(`${API_BASE_URL}/grade/vibe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Vibe': vibe },
+    body: await fetch(uri).then(r => r.blob()),
+  });
+  if (!response.ok) throw new Error(`Vibe grading failed: ${response.status}`);
+  const styleName = response.headers.get('X-Grade-Preset-Name') ?? 'Custom';
+  const blob = await response.blob();
+  const gradedUri = URL.createObjectURL(blob);
+  return { gradedUri, styleName };
+}
+
+
 export async function guideComposition(uri: string): Promise<{ instructions: string[]; compositionTip: string }> {
   const response = await fetch(`${API_BASE_URL}/guide`, {
     method: 'POST',

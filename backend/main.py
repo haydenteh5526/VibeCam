@@ -415,6 +415,107 @@ async def grade_photo(
     return Response(content=graded_bytes, media_type="image/jpeg", headers={"X-Grade-Preset-Id": preset_id, "X-Grade-Preset-Name": preset_name})
 
 
+@app.post("/grade/vibe", tags=["grading"])
+async def grade_with_vibe(
+    request: Request,
+    payload: bytes = Body(
+        ...,
+        media_type="application/octet-stream",
+        min_length=1,
+        max_length=MAX_UPLOAD_BYTES,
+    ),
+):
+    """Grade a photo based on a user-described vibe/mood."""
+    from ai import get_provider
+    from PIL import Image, ImageEnhance
+    from io import BytesIO
+    import os
+    import json
+    import numpy as np
+
+    vibe = request.headers.get("X-Vibe", "cinematic and moody")
+
+    if not (os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY")):
+        raise HTTPException(status_code=503, detail="AI not configured. Set GOOGLE_AI_API_KEY in .env")
+
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type and content_type != "application/octet-stream":
+        raise HTTPException(status_code=415, detail="content-type must be application/octet-stream")
+
+    try:
+        provider = get_provider()
+        # Custom prompt with user's vibe
+        import base64
+        import httpx
+        b64 = base64.b64encode(payload).decode()
+
+        vibe_prompt = f"""You are a professional color grader. The user wants this vibe/mood: "{vibe}"
+
+Analyze this photo and return color grading parameters that achieve the requested vibe.
+
+Return ONLY a JSON object (no markdown):
+{{"temperature": <-100 to 100>, "tint": <-100 to 100>, "exposure": <-2.0 to 2.0>, "contrast": <-100 to 100>, "highlights": <-100 to 100>, "shadows": <-100 to 100>, "saturation": <-100 to 100>, "vibrance": <-100 to 100>, "grain": <0 to 50>, "vignette": <0 to 100>, "style_name": "<short name describing the result>"}}"""
+
+        api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        api_key = os.getenv("GOOGLE_AI_API_KEY", "")
+        req_payload = {
+            "contents": [{"parts": [{"text": vibe_prompt}, {"inline_data": {"mime_type": "image/jpeg", "data": b64}}]}],
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 300}
+        }
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(f"{api_url}?key={api_key}", json=req_payload)
+            resp.raise_for_status()
+
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        d = json.loads(text)
+
+        # Apply the AI-determined values
+        img = Image.open(BytesIO(payload)).convert("RGB")
+        arr = np.array(img, dtype=np.float32)
+
+        arr = arr * (2 ** float(d.get("exposure", 0)))
+        arr[:, :, 0] += float(d.get("temperature", 0)) * 0.5
+        arr[:, :, 2] -= float(d.get("temperature", 0)) * 0.5
+        arr = (arr - 128) * (1 + float(d.get("contrast", 0)) / 100) + 128
+        shadow_mask = (1.0 - arr / 255.0) ** 2
+        arr += shadow_mask * float(d.get("shadows", 0)) * 0.3
+        hl_mask = (arr / 255.0) ** 2
+        arr -= hl_mask * float(d.get("highlights", 0)) * 0.3
+        arr = np.clip(arr, 0, 255).astype(np.uint8)
+        img = Image.fromarray(arr)
+
+        sat_val = float(d.get("saturation", 0))
+        if sat_val != 0:
+            img = ImageEnhance.Color(img).enhance(1 + sat_val / 100)
+
+        grain_val = float(d.get("grain", 0))
+        if grain_val > 0:
+            a = np.array(img, dtype=np.float32)
+            a = np.clip(a + np.random.normal(0, grain_val, a.shape), 0, 255).astype(np.uint8)
+            img = Image.fromarray(a)
+
+        vignette_val = float(d.get("vignette", 0))
+        if vignette_val > 0:
+            a = np.array(img, dtype=np.float32)
+            h, w = a.shape[:2]
+            y, x = np.ogrid[:h, :w]
+            dist = np.sqrt((x - w/2)**2 + (y - h/2)**2)
+            v = 1.0 - (vignette_val / 100) * (dist / np.sqrt((w/2)**2 + (h/2)**2))**2
+            a = np.clip(a * v[:, :, np.newaxis], 0, 255).astype(np.uint8)
+            img = Image.fromarray(a)
+
+        output = BytesIO()
+        img.save(output, format="JPEG", quality=92)
+        from fastapi.responses import Response
+        return Response(content=output.getvalue(), media_type="image/jpeg", headers={"X-Grade-Preset-Id": "vibe", "X-Grade-Preset-Name": d.get("style_name", "Custom Vibe")})
+
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Vibe grading failed: {exc}")
+
+
 @app.post("/guide", tags=["guidance"])
 async def guide_composition(
     request: Request,
