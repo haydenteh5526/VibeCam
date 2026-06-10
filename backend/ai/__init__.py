@@ -39,12 +39,15 @@ class AIProvider(ABC):
 
 
 def get_provider() -> AIProvider:
-    provider = os.getenv("AI_PROVIDER", "gemini").lower()
+    provider = os.getenv("AI_PROVIDER", "g4f").lower()
     if provider == "gemini":
         from .gemini import GeminiProvider
         return GeminiProvider()
     elif provider == "openai":
         from .openai import OpenAIProvider
         return OpenAIProvider()
+    elif provider == "g4f":
+        from .g4f import G4FProvider
+        return G4FProvider()
     else:
         raise ValueError(f"Unknown AI_PROVIDER: {provider}")

@@ -8,9 +8,9 @@ h11==0.16.0
 httpx==0.28.1
 httptools==0.7.1
 idna==3.12
-numpy==2.4.4
-opencv-python-headless==4.13.0.20250525
-pillow==12.2.0
+numpy>=2.0.0
+opencv-python-headless>=4.8.0
+pillow>=10.0.0
 pydantic==2.13.3
 pydantic_core==2.46.3
 pytest==8.4.2

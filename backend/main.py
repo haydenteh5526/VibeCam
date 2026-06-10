@@ -350,7 +350,7 @@ async def grade_photo(
         raise HTTPException(status_code=415, detail="content-type must be application/octet-stream")
 
     # Try AI-powered grading first, fall back to preset-based
-    if os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY"):
+    if os.getenv("AI_PROVIDER") == "g4f" or os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY"):
         try:
             provider = get_provider()
             result = await provider.grade_photo(payload)
@@ -444,8 +444,8 @@ async def grade_with_vibe(
 
     vibe = request.headers.get("X-Vibe", "cinematic and moody")
 
-    if not (os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY")):
-        raise HTTPException(status_code=503, detail="AI not configured. Set GOOGLE_AI_API_KEY in .env")
+    if not (os.getenv("AI_PROVIDER") == "g4f" or os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY")):
+        raise HTTPException(status_code=503, detail="AI not configured. Set AI_PROVIDER=g4f or GOOGLE_AI_API_KEY in .env")
 
     content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if content_type and content_type != "application/octet-stream":
@@ -538,8 +538,8 @@ async def guide_composition(
     from ai import get_provider
     import os
 
-    if not (os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY")):
-        raise HTTPException(status_code=503, detail="AI not configured. Set GOOGLE_AI_API_KEY in .env")
+    if not (os.getenv("AI_PROVIDER") == "g4f" or os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY")):
+        raise HTTPException(status_code=503, detail="AI not configured. Set AI_PROVIDER=g4f or GOOGLE_AI_API_KEY in .env")
 
     content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if content_type and content_type != "application/octet-stream":
