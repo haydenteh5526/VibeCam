@@ -3,9 +3,9 @@
   <p><strong>AI-powered photo & video analysis app</strong></p>
   <p>Capture, upload, and analyze photos and videos with AI grading and feedback.</p>
 
-  ![License](https://img.shields.io/github/license/haydenteh5526/vibe-cam)
-  ![Last Commit](https://img.shields.io/github/last-commit/haydenteh5526/vibe-cam)
-  ![Top Language](https://img.shields.io/github/languages/top/haydenteh5526/vibe-cam)
+  ![License](https://img.shields.io/github/license/haydenteh5526/VibeCam)
+  ![Last Commit](https://img.shields.io/github/last-commit/haydenteh5526/VibeCam)
+  ![Top Language](https://img.shields.io/github/languages/top/haydenteh5526/VibeCam)
 </div>
 
 ---
