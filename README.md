@@ -1,5 +1,6 @@
 <div align="center">
-  <h1>📸 VibeCam</h1>
+  <img src="docs/icons/icon.svg" height="80" width="80" />
+  <h1>VibeCam</h1>
   <p><strong>AI-powered photo & video analysis app</strong></p>
   <p>Capture, upload, and analyze photos and videos with AI grading and feedback.</p>
 
