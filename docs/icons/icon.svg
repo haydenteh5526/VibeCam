@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1a1a2e"/>
+  <!-- Camera body -->
+  <rect x="120" y="190" width="272" height="200" rx="24" fill="#16213e" stroke="#0f3460" stroke-width="4"/>
+  <!-- Lens ring -->
+  <circle cx="256" cy="290" r="72" fill="none" stroke="#e94560" stroke-width="8"/>
+  <circle cx="256" cy="290" r="52" fill="#0f3460"/>
+  <circle cx="256" cy="290" r="30" fill="#16213e" stroke="#e94560" stroke-width="3"/>
+  <!-- Flash -->
+  <rect x="310" y="210" width="40" height="16" rx="8" fill="#e94560" opacity="0.8"/>
+  <!-- Viewfinder bump -->
+  <rect x="200" y="165" width="112" height="35" rx="10" fill="#16213e" stroke="#0f3460" stroke-width="3"/>
+  <!-- Sparkles -->
+  <circle cx="380" cy="160" r="6" fill="#e94560"/>
+  <circle cx="400" cy="180" r="3" fill="#e94560" opacity="0.6"/>
+  <circle cx="130" cy="170" r="4" fill="#e94560" opacity="0.7"/>
+  <circle cx="150" cy="150" r="2.5" fill="#e94560" opacity="0.5"/>
+  <!-- Star sparkle -->
+  <path d="M420 140 l4-12 4 12 12 4-12 4-4 12-4-12-12-4z" fill="#e94560" opacity="0.9"/>
+  <path d="M110 200 l3-9 3 9 9 3-9 3-3 9-3-9-9-3z" fill="#e94560" opacity="0.7"/>
+</svg>

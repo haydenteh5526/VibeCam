@@ -1,11 +1,12 @@
 <div align="center">
-  <h1>📸 VibeCam</h1>
+  <img src="docs/icons/icon.svg" height="80" width="80" />
+  <h1>VibeCam</h1>
   <p><strong>Point-and-shoot pocket camera simulator</strong></p>
   <p>Capture photos with the color science of iconic compact cameras — Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD digicams, and Canon PowerShot.</p>
 
-  ![License](https://img.shields.io/github/license/haydenteh5526/vibe-cam)
-  ![Last Commit](https://img.shields.io/github/last-commit/haydenteh5526/vibe-cam)
-  ![Top Language](https://img.shields.io/github/languages/top/haydenteh5526/vibe-cam)
+  ![License](https://img.shields.io/github/license/haydenteh5526/VibeCam)
+  ![Last Commit](https://img.shields.io/github/last-commit/haydenteh5526/VibeCam)
+  ![Top Language](https://img.shields.io/github/languages/top/haydenteh5526/VibeCam)
 </div>
 
 ---
