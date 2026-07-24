@@ -405,14 +405,37 @@ async def grade_photo(
         except Exception:
             pass  # fall through to deterministic camera emulation
 
-    # Deterministic camera emulation (default path — reliable and offline).
+    requested = None if camera in ("", "auto", "ai") else camera
+
+    # Explicit camera with a built profile -> reference-matched (real-sample) look.
+    if requested:
+        try:
+            from camera_match import grade_with_reference
+            ref = grade_with_reference(payload, requested)
+        except Exception:
+            ref = None
+        if ref:
+            jpeg, cam_id, scene, _method = ref
+            from grading import CAMERAS
+            name = CAMERAS.get(cam_id, {}).get("name", cam_id)
+            return Response(content=jpeg, media_type="image/jpeg", headers={
+                "X-Grade-Preset-Id": cam_id,
+                "X-Grade-Preset-Name": name,
+                "X-Grade-Method": "reference",
+                "X-Grade-Scene": scene,
+            })
+
+    # Deterministic parametric camera emulation (default / fallback when no profile).
     try:
-        requested = None if camera in ("", "auto", "ai") else camera
         graded_bytes, preset_id, preset_name = grade_image(payload, requested)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Could not process image: {exc}")
 
-    return Response(content=graded_bytes, media_type="image/jpeg", headers={"X-Grade-Preset-Id": preset_id, "X-Grade-Preset-Name": preset_name})
+    return Response(content=graded_bytes, media_type="image/jpeg", headers={
+        "X-Grade-Preset-Id": preset_id,
+        "X-Grade-Preset-Name": preset_name,
+        "X-Grade-Method": "preset",
+    })
 
 
 @app.get("/cameras", tags=["grading"])
