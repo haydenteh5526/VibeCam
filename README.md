@@ -112,6 +112,24 @@ Select a look by sending the `X-Camera` header to `POST /grade`:
 | `auto` *(default)* | — | Scene analysis picks the best camera |
 | `ai` | — | AI-directed grade (if a provider is configured) |
 
+### Accurate mode — match a real camera from samples
+
+The `X-Camera` looks above are hand-tuned approximations. For results grounded in
+a **real** camera, teach the app from straight-out-of-camera (SOOC) sample JPEGs:
+
+1. Collect SOOC JPEGs from the target camera (e.g. from sample galleries) and sort
+   them into `backend/camera_samples/<camera>/<scene>/` (`skin`, `daylight`,
+   `indoor`, `flash`). See `backend/camera_samples/README.md`.
+2. Verify them: `cd backend && python tools/check_samples.py g7x`
+3. Build a profile: `python tools/build_profile.py g7x`
+   → writes `backend/camera_profiles/g7x.json` (small derived stats — safe to commit; the images stay local/git-ignored).
+
+Once a profile exists, `POST /grade` with that `X-Camera` maps your photo toward the
+real camera's color/tone using a scene-aware Monge–Kantorovich (MKL) color transfer,
+and reports `X-Grade-Method: reference`. Without a profile it falls back to the
+parametric preset (`X-Grade-Method: preset`). Color/tone can get convincingly close;
+optical traits (a 1-inch sensor's depth of field, low-light character) can't be reproduced from a phone frame.
+
 ## Environment Variables
 
 ### Backend (`backend/.env`)

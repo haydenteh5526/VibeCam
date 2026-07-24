@@ -102,3 +102,10 @@ backend/data/
 
 # Reference repos (not part of project)
 references/
+
+# Camera reference samples (third-party SOOC images — keep local, don't commit)
+backend/camera_samples/**/*.jpg
+backend/camera_samples/**/*.jpeg
+backend/camera_samples/**/*.png
+backend/camera_samples/**/*.heic
+!backend/camera_samples/**/.gitkeep

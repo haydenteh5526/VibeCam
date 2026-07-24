@@ -37,6 +37,16 @@ Last updated: 2026-05-05
 - GitHub Pages content lives under docs/site
 - GitHub Pages deployment workflow (.github/workflows/pages.yml) deploys docs/site on push to main/mvp or manual dispatch
 
+### Camera simulation (point-and-shoot emulation)
+
+- Grading pivoted from generic film looks to **pocket-camera emulation**: Canon G7X III (`g7x`), Sony RX100 (`rx100`), Ricoh GR III (`gr`), Fuji X100 (`x100`), CCD digicam (`ccd`), Canon PowerShot (`powershot`). Select via the `X-Camera` header on `POST /grade`; `auto` picks by scene; `ai` is opt-in.
+- `GET /cameras` lists the emulations. `backend/grading.py` holds the parametric presets; `backend/main.py` wires selection; mobile sends the selected camera and shows it in the preview.
+- **Accurate mode (reference matching)**: `backend/camera_match.py` learns a camera's real color/tone from SOOC sample JPEGs and applies a scene-aware Monge–Kantorovich (MKL) color transfer.
+  - Samples: `backend/camera_samples/<camera>/<scene>/` (git-ignored; scenes: skin/daylight/indoor/flash).
+  - Tools: `tools/check_samples.py` (EXIF verification) and `tools/build_profile.py` (writes `backend/camera_profiles/<camera>.json`, committable derived stats).
+  - `POST /grade` uses the profile when present (`X-Grade-Method: reference`, `X-Grade-Scene: <scene>`) and falls back to the parametric preset (`X-Grade-Method: preset`).
+  - No new dependencies (numpy + Pillow + OpenCV only). MKL is implemented in `camera_match.py`.
+
 ## Verified Working
 
 - Python dependencies installed in the selected virtual environment
