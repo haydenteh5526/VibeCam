@@ -1,4 +1,8 @@
-"""Advanced AI color grading engine.
+"""Point-and-shoot pocket camera emulation + color grading engine.
+
+Reproduces the in-camera JPEG "look" of popular compact cameras (Canon G7X III,
+Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD digicams, Canon PowerShot) plus a set
+of film-stock looks. Deterministic and offline-friendly.
 Techniques from: color-matcher (Reinhard transfer), RapidRAW (HSL mixer, 3-way grading, skin-aware vibrance)."""
 
 from io import BytesIO
@@ -97,6 +101,93 @@ PRESETS = {
         "grain": 4, "vignette": 25, "fade": 15, "black_point": 18,
     },
 }
+
+
+# ─── Point-and-shoot pocket camera emulations ──────────────────────────────────
+# Each entry reproduces the in-camera JPEG "look" (color science) of a popular
+# compact camera. Same parameter schema as the film PRESETS above, so they flow
+# through the identical grading pipeline. Tuned to be deterministic and offline.
+
+CAMERAS = {
+    "g7x": {
+        "name": "Canon G7X III",
+        "desc": "Canon color science — warm, punchy, flattering skin tones",
+        "temperature": 12, "tint": 2,
+        "contrast": 10, "exposure": 0.03,
+        "shadows": {"hue": 30, "sat": 8, "lum": 3},
+        "midtones": {"hue": 35, "sat": 4, "lum": 0},
+        "highlights": {"hue": 45, "sat": 6, "lum": 2},
+        "hsl": {"orange_sat": 12, "green_sat": 6, "blue_sat": 4},
+        "vibrance": 16, "saturation": 8,
+        "grain": 2, "vignette": 6, "fade": 0, "black_point": 4,
+    },
+    "rx100": {
+        "name": "Sony RX100 VII",
+        "desc": "Sony color — crisp, neutral, true-to-life with high micro-contrast",
+        "temperature": -3, "tint": 0,
+        "contrast": 13, "exposure": 0.0,
+        "shadows": {"hue": 220, "sat": 5, "lum": -2},
+        "midtones": {"hue": 210, "sat": 2, "lum": 0},
+        "highlights": {"hue": 50, "sat": 3, "lum": 1},
+        "hsl": {"orange_sat": 4, "green_sat": 2, "blue_sat": 8},
+        "vibrance": 12, "saturation": 6,
+        "grain": 2, "vignette": 4, "fade": 0, "black_point": 3,
+    },
+    "gr": {
+        "name": "Ricoh GR III",
+        "desc": "High-contrast street look — deep crushed blacks, rich but restrained color",
+        "temperature": 3, "tint": -1,
+        "contrast": 24, "exposure": -0.05,
+        "shadows": {"hue": 210, "sat": 4, "lum": -6},
+        "midtones": {"hue": 30, "sat": 3, "lum": 0},
+        "highlights": {"hue": 40, "sat": 4, "lum": -2},
+        "hsl": {"orange_sat": 6, "green_sat": -6, "blue_sat": 6},
+        "vibrance": 6, "saturation": -2,
+        "grain": 6, "vignette": 12, "fade": 0, "black_point": 2,
+    },
+    "x100": {
+        "name": "Fuji X100 Chrome",
+        "desc": "Classic Chrome film simulation — muted, documentary, amber shadows",
+        "temperature": 2, "tint": -3,
+        "contrast": 6, "exposure": 0.0,
+        "shadows": {"hue": 45, "sat": 10, "lum": -2},
+        "midtones": {"hue": 40, "sat": 3, "lum": 0},
+        "highlights": {"hue": 50, "sat": 2, "lum": 1},
+        "hsl": {"orange_sat": 2, "green_sat": -14, "blue_sat": -10},
+        "vibrance": -6, "saturation": -18,
+        "grain": 5, "vignette": 8, "fade": 6, "black_point": 6,
+    },
+    "ccd": {
+        "name": "CCD Digicam",
+        "desc": "Y2K compact CCD — nostalgic cool-green cast, contrasty, sensor noise",
+        "temperature": -6, "tint": 5,
+        "contrast": 14, "exposure": 0.05,
+        "shadows": {"hue": 150, "sat": 10, "lum": 2},
+        "midtones": {"hue": 160, "sat": 4, "lum": 0},
+        "highlights": {"hue": 190, "sat": 6, "lum": 3},
+        "hsl": {"orange_sat": 6, "green_sat": 10, "blue_sat": 8},
+        "vibrance": 8, "saturation": 14,
+        "grain": 16, "vignette": 16, "fade": 0, "black_point": 10,
+    },
+    "powershot": {
+        "name": "Canon PowerShot",
+        "desc": "Retro Canon compact — warm party flash, punchy reds, blown highlights",
+        "temperature": 9, "tint": 4,
+        "contrast": 8, "exposure": 0.08,
+        "shadows": {"hue": 30, "sat": 12, "lum": 6},
+        "midtones": {"hue": 30, "sat": 6, "lum": 0},
+        "highlights": {"hue": 45, "sat": 8, "lum": 4},
+        "hsl": {"orange_sat": 10, "green_sat": 4, "blue_sat": -4},
+        "vibrance": 10, "saturation": 12,
+        "grain": 10, "vignette": 18, "fade": 4, "black_point": 8,
+    },
+}
+
+# Ordered ids for stable listing / default cycling in the UI.
+CAMERA_ORDER = ["g7x", "rx100", "gr", "x100", "ccd", "powershot"]
+
+# Merged lookup so a single pipeline can resolve either a camera or a film look.
+_LOOKS = {**PRESETS, **CAMERAS}
 
 
 # ─── Core processing (from RapidRAW techniques) ───────────────────────────────
@@ -255,10 +346,26 @@ def pick_best_preset(analysis: dict) -> str:
     return "portra_400"
 
 
+def pick_best_camera(analysis: dict) -> str:
+    """Auto-select the pocket-camera emulation that best fits the scene.
+
+    - Dark scenes    -> CCD digicam (nostalgic noisy low-light / flash look)
+    - Portraits/warm -> Canon G7X III (flattering warm skin tones)
+    - Very bright    -> Sony RX100 (crisp, clean, true-to-life)
+    - Everything else-> Ricoh GR III (punchy high-contrast street look)
+    """
+    b, w, p = analysis["brightness"], analysis["warmth"], analysis["is_portrait"]
+    if b < 0.22: return "ccd"
+    if p: return "g7x"
+    if w > 0.08: return "g7x"
+    if b > 0.62: return "rx100"
+    return "gr"
+
+
 # ─── Main Pipeline ─────────────────────────────────────────────────────────────
 
 def apply_grade(img: Image.Image, preset_id: str) -> Image.Image:
-    p = PRESETS[preset_id]
+    p = _LOOKS[preset_id]
     img = img.convert("RGB")
     arr = np.array(img, dtype=np.float32)
 
@@ -319,11 +426,19 @@ def apply_grade(img: Image.Image, preset_id: str) -> Image.Image:
     return result
 
 
-def grade_image(image_bytes: bytes) -> tuple[bytes, str, str]:
+def grade_image(image_bytes: bytes, preset_id: str | None = None) -> tuple[bytes, str, str]:
+    """Grade an image with a specific camera/film look, or auto-pick a camera.
+
+    preset_id:
+      - a known camera id (e.g. "g7x") or film id (e.g. "kodak_gold") -> that look
+      - None / "" / "auto" / unknown  -> analyze the pixels and auto-pick a camera
+    Returns (jpeg_bytes, resolved_id, display_name).
+    """
     img = Image.open(BytesIO(image_bytes))
-    analysis = analyze_image(img)
-    preset_id = pick_best_preset(analysis)
-    graded = apply_grade(img, preset_id)
+    key = (preset_id or "").strip().lower()
+    if key not in _LOOKS:
+        key = pick_best_camera(analyze_image(img))
+    graded = apply_grade(img, key)
     output = BytesIO()
     graded.save(output, format="JPEG", quality=92)
-    return output.getvalue(), preset_id, PRESETS[preset_id]["name"]
+    return output.getvalue(), key, _LOOKS[key]["name"]

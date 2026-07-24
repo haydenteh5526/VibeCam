@@ -341,78 +341,88 @@ async def grade_photo(
         max_length=MAX_UPLOAD_BYTES,
     ),
 ):
-    from grading import grade_image, apply_grade, PRESETS
-    from ai import get_provider
+    """Apply a point-and-shoot pocket-camera emulation to a photo.
+
+    Choose the look with the ``X-Camera`` request header:
+      - a camera id from ``GET /cameras`` (e.g. ``g7x``, ``rx100``, ``gr``, ``x100``, ``ccd``, ``powershot``)
+      - ``auto`` (default) or omitted -> analyze the pixels and auto-pick a camera
+      - ``ai`` -> AI-directed grade, only if an AI provider is configured (falls back to auto)
+
+    The resolved look is returned in the ``X-Grade-Preset-Id`` / ``X-Grade-Preset-Name`` headers.
+    """
+    from grading import grade_image
+    from fastapi.responses import Response
     import os
 
     content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if content_type and content_type != "application/octet-stream":
         raise HTTPException(status_code=415, detail="content-type must be application/octet-stream")
 
-    # Try AI-powered grading first, fall back to preset-based
-    if os.getenv("AI_PROVIDER") == "g4f" or os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY"):
+    camera = request.headers.get("X-Camera", "auto").strip().lower()
+
+    # Opt-in AI-directed grade (X-Camera: ai). Falls through to camera emulation on any failure.
+    if camera == "ai" and (os.getenv("AI_PROVIDER") or os.getenv("GOOGLE_AI_API_KEY") or os.getenv("OPENAI_API_KEY")):
         try:
-            provider = get_provider()
-            result = await provider.grade_photo(payload)
-            # Apply AI-determined values using grading engine
+            from ai import get_provider
             from PIL import Image, ImageEnhance
             from io import BytesIO
             import numpy as np
 
+            provider = get_provider()
+            result = await provider.grade_photo(payload)
+
             img = Image.open(BytesIO(payload)).convert("RGB")
             arr = np.array(img, dtype=np.float32)
-
-            # Exposure
             arr = arr * (2 ** result.exposure)
-            # Temperature (warm/cool shift)
             arr[:, :, 0] += result.temperature * 0.5
             arr[:, :, 2] -= result.temperature * 0.5
-            # Contrast
             arr = (arr - 128) * (1 + result.contrast / 100) + 128
-            # Shadows (lift darks)
             shadow_mask = (1.0 - arr / 255.0) ** 2
             arr += shadow_mask * result.shadows * 0.3
-            # Highlights (pull brights)
             hl_mask = (arr / 255.0) ** 2
             arr -= hl_mask * result.highlights * 0.3
-
             arr = np.clip(arr, 0, 255).astype(np.uint8)
             img = Image.fromarray(arr)
 
-            # Saturation + Vibrance
             if result.saturation != 0:
                 img = ImageEnhance.Color(img).enhance(1 + result.saturation / 100)
-            # Grain
             if result.grain > 0:
-                arr2 = np.array(img, dtype=np.float32)
-                noise = np.random.normal(0, result.grain, arr2.shape)
-                arr2 = np.clip(arr2 + noise, 0, 255).astype(np.uint8)
-                img = Image.fromarray(arr2)
-            # Vignette
+                a = np.array(img, dtype=np.float32)
+                a = np.clip(a + np.random.normal(0, result.grain, a.shape), 0, 255).astype(np.uint8)
+                img = Image.fromarray(a)
             if result.vignette > 0:
-                arr3 = np.array(img, dtype=np.float32)
-                h, w = arr3.shape[:2]
+                a = np.array(img, dtype=np.float32)
+                h, w = a.shape[:2]
                 y, x = np.ogrid[:h, :w]
                 dist = np.sqrt((x - w/2)**2 + (y - h/2)**2)
                 v = 1.0 - (result.vignette / 100) * (dist / np.sqrt((w/2)**2 + (h/2)**2))**2
-                arr3 = np.clip(arr3 * v[:, :, np.newaxis], 0, 255).astype(np.uint8)
-                img = Image.fromarray(arr3)
+                a = np.clip(a * v[:, :, np.newaxis], 0, 255).astype(np.uint8)
+                img = Image.fromarray(a)
 
             output = BytesIO()
             img.save(output, format="JPEG", quality=92)
-            from fastapi.responses import Response
             return Response(content=output.getvalue(), media_type="image/jpeg", headers={"X-Grade-Preset-Id": "ai", "X-Grade-Preset-Name": result.style_name})
         except Exception:
-            pass  # Fall through to preset-based grading
+            pass  # fall through to deterministic camera emulation
 
-    # Fallback: preset-based grading
+    # Deterministic camera emulation (default path — reliable and offline).
     try:
-        graded_bytes, preset_id, preset_name = grade_image(payload)
+        requested = None if camera in ("", "auto", "ai") else camera
+        graded_bytes, preset_id, preset_name = grade_image(payload, requested)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Could not process image: {exc}")
 
-    from fastapi.responses import Response
     return Response(content=graded_bytes, media_type="image/jpeg", headers={"X-Grade-Preset-Id": preset_id, "X-Grade-Preset-Name": preset_name})
+
+
+@app.get("/cameras", tags=["grading"])
+def list_cameras():
+    """List the point-and-shoot pocket-camera emulations available to the capture UI."""
+    from grading import CAMERAS, CAMERA_ORDER
+    return [
+        {"id": cid, "name": CAMERAS[cid]["name"], "description": CAMERAS[cid]["desc"]}
+        for cid in CAMERA_ORDER
+    ]
 
 
 @app.post("/quality", tags=["guidance"])

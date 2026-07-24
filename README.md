@@ -1,7 +1,7 @@
 <div align="center">
   <h1>📸 VibeCam</h1>
-  <p><strong>AI-powered photo & video analysis app</strong></p>
-  <p>Capture, upload, and analyze photos and videos with AI grading and feedback.</p>
+  <p><strong>Point-and-shoot pocket camera simulator</strong></p>
+  <p>Capture photos with the color science of iconic compact cameras — Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD digicams, and Canon PowerShot.</p>
 
   ![License](https://img.shields.io/github/license/haydenteh5526/vibe-cam)
   ![Last Commit](https://img.shields.io/github/last-commit/haydenteh5526/vibe-cam)
@@ -12,10 +12,11 @@
 
 ## Features
 
+- **Pocket Camera Emulation** — Reproduces the in-camera color science of popular point-and-shoot cameras: Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100 (Classic Chrome), Y2K CCD digicam, and Canon PowerShot
+- **Auto Camera Match** — Scene analysis picks the best-fitting camera look automatically
 - **Camera Capture** — In-app photo and video recording
+- **Vibe Grading** — Optional AI color grade from a text prompt (e.g. "warm nostalgic sunset")
 - **File Upload** — Select files from device with resumable chunked uploads
-- **AI Grading** — Automated photo/video quality analysis and scoring
-- **Resumable Uploads** — Chunked streaming with progress tracking
 - **Cross-Platform** — iOS and Android via Expo
 - **CI/CD** — GitHub Actions for backend tests and mobile typechecks
 
@@ -71,7 +72,7 @@ vibe-cam/
 │   └── App.tsx      → Entry point
 ├── backend/         → FastAPI service
 │   ├── main.py      → API routes & upload logic
-│   ├── grading.py   → AI grading engine
+│   ├── grading.py   → Camera emulation & color grading engine
 │   ├── ai/          → AI models & inference
 │   ├── tests/       → Pytest smoke tests
 │   └── data/        → Local upload storage
@@ -84,11 +85,31 @@ vibe-cam/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Service health check |
+| GET | `/cameras` | List available pocket-camera emulations |
+| POST | `/grade` | Apply a camera emulation to a photo (select via `X-Camera` header) |
+| POST | `/grade/vibe` | AI color grade from a text-described vibe |
+| POST | `/guide` | AI composition / pose guidance |
+| POST | `/quality` | Blur / sharpness quality check |
 | POST | `/uploads/init` | Initialize upload session |
 | GET | `/uploads/{id}` | Get upload session status |
 | GET | `/uploads/{id}/hash` | Get payload SHA256 hash |
 | PUT | `/uploads/{id}/chunks` | Upload file chunks (resumable) |
 | PUT | `/uploads/{id}/content` | Upload full file content |
+
+### Camera emulations
+
+Select a look by sending the `X-Camera` header to `POST /grade`:
+
+| `X-Camera` | Camera | Look |
+|------------|--------|------|
+| `g7x` | Canon G7X III | Warm, punchy, flattering skin tones |
+| `rx100` | Sony RX100 VII | Crisp, neutral, true-to-life |
+| `gr` | Ricoh GR III | High-contrast street, deep blacks |
+| `x100` | Fuji X100 | Classic Chrome — muted, documentary |
+| `ccd` | CCD Digicam | Y2K nostalgia — cool-green cast, noise |
+| `powershot` | Canon PowerShot | Retro party flash, punchy reds |
+| `auto` *(default)* | — | Scene analysis picks the best camera |
+| `ai` | — | AI-directed grade (if a provider is configured) |
 
 ## Environment Variables
 

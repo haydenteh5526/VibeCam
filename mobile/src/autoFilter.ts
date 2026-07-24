@@ -15,27 +15,28 @@ function getTimeOfDay(): 'golden' | 'day' | 'night' {
 }
 
 /**
- * Picks the best filter based on scene context.
- * 
- * Logic:
- * - Golden hour → Kodak Gold (warm tones complement golden light)
- * - Night/low light → Cinema (cool blue tones suit night scenes)
- * - Bright daylight + portrait → Fuji 400H (flattering skin tones, soft greens)
- * - Bright daylight + no portrait → Fade (airy, editorial feel)
- * - Normal light + portrait → CCD (slight pink warmth, trendy)
- * - Normal light + no portrait → Polaroid (nostalgic, versatile)
+ * Picks the best point-and-shoot camera emulation for the current scene.
+ * This drives the live-preview wash only; on capture the backend re-analyzes
+ * the full-resolution pixels and may refine the choice.
+ *
+ * - Golden hour            -> Canon G7X III (warm, flattering skin tones)
+ * - Night / low light      -> CCD digicam (nostalgic noisy flash look)
+ * - Bright daylight + face  -> Canon G7X III (great skin rendering)
+ * - Bright daylight, no face-> Ricoh GR III (punchy high-contrast scenes)
+ * - Normal light + face     -> Canon G7X III
+ * - Normal light, no face   -> Sony RX100 (crisp, true-to-life)
  */
 export function pickBestFilter(context: Partial<SceneContext> = {}): FilterId {
   const time = context.timeOfDay ?? getTimeOfDay();
   const brightness = context.brightness ?? 'normal';
   const hasPortrait = context.hasPortrait ?? false;
 
-  if (time === 'golden') return 'kodak';
-  if (time === 'night' || brightness === 'low') return 'cinema';
-  if (brightness === 'bright' && hasPortrait) return 'fuji';
-  if (brightness === 'bright' && !hasPortrait) return 'fade';
-  if (hasPortrait) return 'ccd';
-  return 'polaroid';
+  if (time === 'night' || brightness === 'low') return 'ccd';
+  if (time === 'golden') return 'g7x';
+  if (brightness === 'bright' && hasPortrait) return 'g7x';
+  if (brightness === 'bright' && !hasPortrait) return 'gr';
+  if (hasPortrait) return 'g7x';
+  return 'rx100';
 }
 
 export function getFilterName(id: FilterId): string {

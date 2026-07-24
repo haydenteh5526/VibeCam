@@ -9,6 +9,7 @@ type Props = {
   file: SelectedFile;
   captured: string | null;
   backendReady: boolean;
+  presetName?: string | null;
   onClose: () => void;
   onSave: () => void;
   onShare: () => void;
@@ -16,7 +17,7 @@ type Props = {
   onDelete: () => void;
 };
 
-export function PreviewScreen({ file, captured, backendReady, onClose, onSave, onShare, onUpload, onDelete }: Props) {
+export function PreviewScreen({ file, captured, backendReady, presetName, onClose, onSave, onShare, onUpload, onDelete }: Props) {
   const isVid = file.mimeType.startsWith('video/');
   const translateY = useRef(new Animated.Value(0)).current;
   const [vibe, setVibe] = useState('');
@@ -55,8 +56,12 @@ export function PreviewScreen({ file, captured, backendReady, onClose, onSave, o
         <Pressable onPress={onDelete} style={s.pillDanger}><Text style={s.pillDangerT}>Delete</Text></Pressable>
       </View>
 
-      {/* Vibe result badge */}
-      {vibeResult && <View style={s.vibeBadge}><Text style={s.vibeBadgeT}>{vibeResult}</Text></View>}
+      {/* Applied camera / vibe badge */}
+      {vibeResult ? (
+        <View style={s.vibeBadge}><Text style={s.vibeBadgeT}>{vibeResult}</Text></View>
+      ) : presetName ? (
+        <View style={s.camBadge}><Text style={s.camBadgeT}>{`\uD83D\uDCF7  ${presetName}`}</Text></View>
+      ) : null}
 
       {/* Bottom */}
       <View style={s.bot}>
@@ -96,6 +101,8 @@ const s = StyleSheet.create({
   pillDangerT: { color: '#ef4444', fontSize: 13, fontWeight: '500' },
   vibeBadge: { position: 'absolute', top: 100, alignSelf: 'center', backgroundColor: 'rgba(28,28,30,0.9)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   vibeBadgeT: { color: '#FFD60A', fontSize: 12, fontWeight: '600' },
+  camBadge: { position: 'absolute', top: 100, alignSelf: 'center', backgroundColor: 'rgba(28,28,30,0.9)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  camBadgeT: { color: '#fff', fontSize: 12, fontWeight: '600' },
   bot: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingBottom: 40, gap: 12 },
   vibeRow: { flexDirection: 'row', gap: 8 },
   vibeInput: { flex: 1, height: 40, backgroundColor: '#1c1c1e', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 12, color: '#fff', fontSize: 13 },

@@ -21,7 +21,7 @@ const ASPECT_H: Record<AspectState, number> = { '4:3': W * (4/3), '16:9': W * (1
 const ZOOM_LEVELS = [0, 0.14, 0.35, 0.7] as const;
 const ZOOM_LABELS = ['0.5', '1', '2', '5'] as const;
 
-type Props = { onCapture: (file: SelectedFile, uri: string, filterId: FilterId) => void; onGallery: () => void; lastThumb: string | null };
+type Props = { onCapture: (file: SelectedFile, uri: string, camera: FilterId | 'auto') => void; onGallery: () => void; lastThumb: string | null };
 
 export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
   const [micPerm, requestMic] = useMicrophonePermissions();
@@ -132,10 +132,11 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
     if (!p?.uri) return;
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status === 'granted') await MediaLibrary.saveToLibraryAsync(p.uri);
-    const resolvedFilter: FilterId = activeFilter === 'auto' ? pickBestFilter({ brightness: lowLight ? 'low' : 'normal', hasPortrait: faceDetected }) : activeFilter;
     const fi = new File(p.uri).info();
-    onCapture({ uri: p.uri, name: `IMG_${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: fi.exists && typeof fi.size === 'number' ? fi.size : null }, p.uri, resolvedFilter);
-  }, [ready, onCapture, triggerFlash, activeFilter, lowLight, faceDetected]);
+    // Send the raw selection ('auto' or a camera id). On 'auto' the backend
+    // analyzes the full-resolution pixels to pick the best-fitting camera.
+    onCapture({ uri: p.uri, name: `IMG_${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: fi.exists && typeof fi.size === 'number' ? fi.size : null }, p.uri, activeFilter);
+  }, [ready, onCapture, triggerFlash, activeFilter]);
 
   const captureWithTimer = useCallback(() => { if (timer === 0) { doCapture(); return; } setCountdown(timer); let t = timer; const iv = setInterval(() => { t--; if (t <= 0) { clearInterval(iv); setCountdown(null); doCapture(); } else setCountdown(t); }, 1000); }, [timer, doCapture]);
 
@@ -234,7 +235,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
         </View>
       )}
 
-      {/* Filter strip — Auto (AI grading) + manual presets with color dots */}
+      {/* Camera strip — Auto (scene-based) + point-and-shoot pocket-camera emulations */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll} style={st.filterArea}>
         <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}>
           <View style={[st.fDot, { backgroundColor: '#22c55e' }]} />
@@ -242,11 +243,14 @@ export function CameraScreen({ onCapture, onGallery, lastThumb }: Props) {
         </Pressable>
         {FILTERS.filter(f => f.id !== 'original').map(f => (
           <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}>
-            <View style={[st.fDot, { backgroundColor: f.style.overlayColor || (f.id === 'bw' ? '#808080' : '#fff') }]} />
+            <View style={[st.fDot, { backgroundColor: f.dot }]} />
             <Text style={[st.fChipT, activeFilter === f.id && st.fChipTA]}>{f.name}</Text>
           </Pressable>
         ))}
       </ScrollView>
+      <Text style={st.camTag} numberOfLines={1}>
+        {activeFilter === 'auto' ? 'Auto · best camera for the scene' : (FILTERS.find(f => f.id === activeFilter)?.tagline ?? '')}
+      </Text>
 
       {/* Shutter — with glow */}
       <View style={st.shutterArea}>
@@ -333,6 +337,7 @@ const st = StyleSheet.create({
   fDot: { width: 8, height: 8, borderRadius: 4 },
   fChipT: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600' },
   fChipTA: { color: '#fff' },
+  camTag: { color: '#8e8e93', fontSize: 10, textAlign: 'center', marginTop: 4, paddingHorizontal: 16 },
 
   // Shutter area
   shutterArea: { alignItems: 'center', paddingVertical: 10 },
