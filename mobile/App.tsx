@@ -23,22 +23,23 @@ export default function App() {
 
   useEffect(() => { checkHealth().then(setBackend); }, []);
 
-  // Photo captured + auto-saved → send to AI for grading
-  const onCapture = useCallback(async (f: SelectedFile, uri: string, _filterId: FilterId) => {
-    setFile(f); setCaptured(uri);
-    if (f.mimeType.startsWith('image/')) setLastThumb(uri);
+  // Photo captured + auto-saved → apply the selected pocket-camera emulation
+  const onCapture = useCallback(async (f: SelectedFile, uri: string, camera: FilterId | 'auto') => {
+    setFile(f); setCaptured(uri); setGradeName(null);
+    const isImage = f.mimeType.startsWith('image/');
+    if (isImage) setLastThumb(uri);
 
-    // Send to backend for AI color grading
-    if (backend) {
+    // Backend renders the chosen camera's color science (photos only).
+    if (backend && isImage) {
       setGrading(true);
       try {
-        const { gradedUri, presetName } = await gradePhoto(uri);
+        const { gradedUri, presetName } = await gradePhoto(uri, camera);
         setCaptured(gradedUri);
         setLastThumb(gradedUri);
         setFile({ ...f, uri: gradedUri });
         setGradeName(presetName);
       } catch {
-        // Grading failed — use original photo
+        // Grading failed — keep the original photo
         setGradeName(null);
       } finally {
         setGrading(false);
@@ -72,13 +73,13 @@ export default function App() {
   }, []);
 
   const reset = useCallback(() => {
-    setCaptured(null); setFile(null); setProgress(0); setHash(null); setScreen('camera');
+    setCaptured(null); setFile(null); setProgress(0); setHash(null); setGradeName(null); setScreen('camera');
   }, []);
 
   if (!camPerm?.granted) return <PermissionScreen onAllow={requestCam} />;
   if (screen === 'gallery') return <GalleryScreen gallery={gallery} onBack={reset} />;
   if (screen === 'done') return <DoneScreen hash={hash} onGallery={onGallery} onNew={reset} />;
   if (screen === 'uploading') return <UploadingScreen progress={progress} />;
-  if (screen === 'preview' && file) return <PreviewScreen file={file} captured={captured} backendReady={backend} onClose={reset} onSave={reset} onShare={onShare} onUpload={onUpload} onDelete={reset} />;
+  if (screen === 'preview' && file) return <PreviewScreen file={file} captured={captured} backendReady={backend} presetName={gradeName} onClose={reset} onSave={reset} onShare={onShare} onUpload={onUpload} onDelete={reset} />;
   return <CameraScreen onCapture={onCapture} onGallery={onGallery} lastThumb={lastThumb} />;
 }
