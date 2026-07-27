@@ -114,9 +114,24 @@ Response headers: `X-Grade-Preset-Id`, `X-Grade-Preset-Name`, `X-Grade-Method`
 
 `CameraScreen` sends the selection (`FilterId | 'auto'`) → `App.onCapture` →
 `api.gradePhoto(uri, camera)` sets the `X-Camera` header → `POST /grade`.
-Only photos are graded (videos skipped). `PreviewScreen` shows the applied camera.
+`App` keeps the ungraded frame as `original` and shows the graded result; the
+**graded** JPEG is what gets written to the camera roll (`MediaLibrary`), not the raw
+capture. `PreviewScreen` shows which look was applied, lets you **re-grade the same
+frame** with any camera (always re-grading from `original`, so looks never stack),
+and hold-to-compare against the original.
 Backend: explicit camera + profile → **reference**; else → **parametric preset**;
 `auto` → scene-based parametric pick; `ai` → AI (if configured).
+
+**Grade state** (`App.GradeState`) is surfaced honestly in the UI:
+`none` (backend offline) | `grading` | `graded` | `failed` — a failed or skipped grade
+says so instead of silently showing the untouched photo.
+
+**Mobile UI principle**: no placebo controls. Only capabilities that actually do
+something are exposed (flash, timer, grid, flip, pinch zoom, pose guide). Format /
+aspect / night-mode / exposure-slider / tap-focus were removed because expo-camera
+exposes no such control — they animated but changed nothing. Zoom reads out as a
+percentage of the lens range (expo-camera's `zoom` is 0..1), not a fake "2×".
+Scene/portrait classification lives **server-side** only; the app no longer guesses.
 
 ---
 

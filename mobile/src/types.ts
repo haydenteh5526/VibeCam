@@ -33,5 +33,4 @@ export type SelectedFile = {
   sizeBytes: number | null;
 };
 
-export type CaptureMode = 'photo' | 'video';
 export type AppScreen = 'camera' | 'preview' | 'uploading' | 'done' | 'gallery';

@@ -14,8 +14,10 @@
 ## Features
 
 - **Pocket Camera Emulation** — Reproduces the in-camera color science of popular point-and-shoot cameras: Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100 (Classic Chrome), Y2K CCD digicam, and Canon PowerShot
-- **Auto Camera Match** — Scene analysis picks the best-fitting camera look automatically
-- **Camera Capture** — In-app photo and video recording
+- **Auto Camera Match** — The backend analyzes the captured pixels and picks the best-fitting camera
+- **Photo Capture** — Point-and-shoot capture with flash, timer, grid, pinch zoom and pose guidance
+- **Graded Photos Saved Automatically** — The emulated result is written to your camera roll
+- **Re-develop After the Shot** — Tap any camera in the preview to re-grade the same frame; hold to compare against the untouched original
 - **Vibe Grading** — Optional AI color grade from a text prompt (e.g. "warm nostalgic sunset")
 - **File Upload** — Select files from device with resumable chunked uploads
 - **Cross-Platform** — iOS and Android via Expo

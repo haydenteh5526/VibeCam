@@ -17,14 +17,14 @@
       "bundleIdentifier": "com.vibecam.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow VibeCam to access the camera for recording clips.",
-        "NSMicrophoneUsageDescription": "Allow VibeCam to access the microphone for recording audio."
+        "NSCameraUsageDescription": "Allow VibeCam to access the camera to take photos.",
+        "NSPhotoLibraryAddUsageDescription": "Allow VibeCam to save your graded photos to your photo library.",
+        "NSPhotoLibraryUsageDescription": "Allow VibeCam to save and access photos you capture in the app."
       }
     },
     "android": {
       "permissions": [
-        "CAMERA",
-        "RECORD_AUDIO"
+        "CAMERA"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -45,7 +45,15 @@
     },
     "owner": "hayyyyy",
     "plugins": [
-      "expo-video"
+      "expo-video",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow VibeCam to save and access photos you capture in the app.",
+          "savePhotosPermission": "Allow VibeCam to save your graded photos to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ]
   }
 }
