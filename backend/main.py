@@ -5,6 +5,7 @@ import sqlite3
 from typing import Literal
 from uuid import uuid4
 import hashlib
+import hmac
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,6 +33,16 @@ def _read_env_int(name: str, default: int, min_value: int) -> int:
 
 MAX_UPLOAD_BYTES = _read_env_int("VIBECAM_MAX_UPLOAD_BYTES", 50 * 1024 * 1024, 1)
 UPLOAD_INIT_TTL_MINUTES = _read_env_int("VIBECAM_UPLOAD_TTL_MINUTES", 15, 1)
+
+# Shared-secret gate. When VIBECAM_API_KEY is set, every route except the public
+# ones below must send a matching X-API-Key header. Left unset (e.g. local dev) the
+# API stays open. Set it for any deployment reachable from the internet, otherwise
+# anyone with the URL can spend your CPU on /grade and fill your disk via /uploads.
+API_KEY = (os.getenv("VIBECAM_API_KEY") or "").strip()
+
+# /health must stay open so platform health checks (Render) keep working, and
+# OPTIONS is exempt so CORS preflight isn't blocked before the real request.
+PUBLIC_PATHS = frozenset({"/health"})
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 UPLOADS_DIR = DATA_DIR / "uploads"
@@ -116,6 +127,21 @@ class UploadHashResponse(BaseModel):
 
 
 app = FastAPI(title="VibeCam API", version="0.1.0")
+
+
+# Registered before CORSMiddleware so CORS ends up the outer layer: a rejected
+# request still comes back with CORS headers instead of looking like a network error.
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    if API_KEY and request.method != "OPTIONS" and request.url.path not in PUBLIC_PATHS:
+        provided = request.headers.get("X-API-Key", "")
+        # Constant-time compare so a wrong key can't be recovered by timing.
+        if not hmac.compare_digest(provided, API_KEY):
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(status_code=401, content={"detail": "invalid or missing X-API-Key"})
+    return await call_next(request)
+
 
 local_origins = [
     "http://localhost",

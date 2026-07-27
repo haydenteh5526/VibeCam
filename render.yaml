@@ -14,3 +14,7 @@ services:
         value: "52428800"
       - key: VIBECAM_UPLOAD_TTL_MINUTES
         value: "15"
+      # sync: false = value is NOT stored in the repo; set it in the Render dashboard
+      # (Environment tab). Without it the deployed API is open to anyone with the URL.
+      - key: VIBECAM_API_KEY
+        sync: false
