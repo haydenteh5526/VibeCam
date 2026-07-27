@@ -74,6 +74,32 @@ npx expo start
 Install **Expo Go** from the App Store, then scan the QR code with the iPhone camera.
 Phone and PC must be on the same Wi-Fi.
 
+#### Phone not on the same network (mobile data, guest Wi-Fi, office network)
+
+LAN mode serves the JS bundle from the laptop's private address (e.g.
+`192.168.0.237:8081`), which a phone on cellular cannot reach. Use tunnel mode:
+
+```bash
+npx expo start --tunnel
+```
+
+`@expo/ngrok` is already a pinned devDependency, so this runs without an install
+prompt. The bundle is relayed through a public URL, so the phone can be on mobile data
+or any other network. It's slower to load and hot-reload than LAN — prefer plain
+`npx expo start` when both devices share Wi-Fi.
+
+Tunnel mode only covers the **dev server**. A backend on `http://<LAN-IP>:8000` is
+still unreachable from another network, so pair tunnel mode with the deployed Render
+URL in `EXPO_PUBLIC_API_BASE_URL` (it's on the public internet, so any connection
+works).
+
+#### If Expo Go won't connect on the same Wi-Fi
+
+- **Client isolation**: many routers, and most guest/hotel/office networks, block
+  device-to-device traffic. Same SSID, still no connection → use `--tunnel`.
+- **Windows Firewall** commonly blocks inbound `8081`. Allow Node through, or
+  use `--tunnel`.
+
 Caveats: Expo Go ignores `app.json`'s `infoPlist` / plugin config and uses its own
 permission strings, so the photo-library prompt will say *Expo Go* wants access.
 Saving still works. Nothing else in this app depends on custom native config.
