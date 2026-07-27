@@ -57,33 +57,60 @@ EXPO_PUBLIC_API_KEY=<the same key>
 `EXPO_PUBLIC_*` values are compiled into the bundle. That's fine here: the key stops
 random internet traffic, it isn't a secret from someone holding your build.
 
-## 4. Build onto the iPhone **[you]**
+## 4. Get it onto the iPhone **[you]**
 
-Camera access needs a real build (Expo Go can't use the native camera config here).
+Every dependency is a first-party Expo module (no custom native code), so **Expo Go
+works** — which matters because `npx expo run:ios` needs macOS + Xcode and is not an
+option from Windows.
+
+### Fastest: Expo Go (no build, no Mac)
 
 ```bash
 cd mobile
-npx expo prebuild --platform ios
-npx expo run:ios --device        # USB-connected iPhone; needs macOS + Xcode
+npm install
+npx expo start
 ```
 
-No Mac? Use EAS cloud builds:
+Install **Expo Go** from the App Store, then scan the QR code with the iPhone camera.
+Phone and PC must be on the same Wi-Fi.
+
+Caveats: Expo Go ignores `app.json`'s `infoPlist` / plugin config and uses its own
+permission strings, so the photo-library prompt will say *Expo Go* wants access.
+Saving still works. Nothing else in this app depends on custom native config.
+
+### For a standalone app: EAS cloud build
+
+Builds on Apple hardware in the cloud, so it works from Windows:
 
 ```bash
-npx eas build -p ios --profile development   # then install via the QR/link
+cd mobile
+npx eas build -p ios --profile development   # install via the QR/link it prints
 ```
 
-Both paths need a free Apple ID for signing; a paid account isn't required for
+Needs a free Apple ID for signing; a paid developer account isn't required for
 personal device installs.
 
-## 5. Camera settings for best accuracy
+## 5. Camera settings — what actually matters
 
-The looks are calibrated against straight-out-of-camera JPEGs, so give the app the
-most neutral possible input:
+The app captures through **expo-camera (AVFoundation)**, not Apple's Camera app. The
+stock app's computational pipeline — Smart HDR, Deep Fusion, Photographic Styles — is
+part of *Apple's* app, so those Settings toggles largely do not affect what VibeCam
+captures. That works in our favour: a less-processed, flatter frame is better input
+for camera emulation.
 
-- **Settings → Camera → Photographic Styles → Standard** (a baked-in style fights the emulation)
-- **Settings → Camera → Formats → Most Compatible** (JPEG rather than HEIF)
-- Leave HDR on; turn Night mode off for `ccd`/`powershot`, whose character is partly noise
+Notes for specific devices:
+
+- **iPhone 12 Pro Max** (and any pre-iPhone-13): **Photographic Styles doesn't exist**
+  on this hardware — it arrived with the iPhone 13. Nothing to disable.
+- **iPhone 13 and later**: Photographic Styles applies only to the stock Camera app,
+  so it shouldn't affect VibeCam either. Set it to Standard anyway if you also want
+  your normal photos neutral for comparison.
+- **Settings → Camera → Formats** likewise governs the stock app; expo-camera returns
+  a JPEG regardless.
+
+Exactly how much processing AVFoundation applies by default on a given iPhone is worth
+confirming on-device — shoot the same scene in VibeCam and the stock Camera app and
+compare. If VibeCam's frame looks flatter, that's expected and correct.
 
 ## 6. What to check on device
 
