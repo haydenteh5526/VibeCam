@@ -173,12 +173,23 @@ Flickr camera-finder for the model.
 
 ---
 
-## 9. iPhone capture notes (current device)
+## 9. iPhone capture notes
 
-iPhone applies Smart HDR / Deep Fusion / tone mapping that pre-stylizes each shot
-and fights the emulation. Set **Settings → Camera → Photographic Styles → Standard**.
-Color/tone matching still helps a lot; the deeper depth of field and computational
-HDR remain (see §8).
+Target device: **iPhone 12 Pro Max**. Dev machine is **Windows**, so `expo run:ios`
+(macOS/Xcode only) is unavailable — use **Expo Go** (all deps are first-party Expo
+modules, so it works) or an **EAS cloud build**. See `docs/DEPLOY.md`.
+
+Capture goes through **expo-camera / AVFoundation**, *not* Apple's Camera app, so the
+stock app's Smart HDR / Deep Fusion / Photographic Styles pipeline largely does not
+apply to VibeCam's frames. Helpful for us: a flatter, less-processed input is better
+raw material for emulation.
+
+Note **Photographic Styles does not exist on the iPhone 12 Pro Max** (iPhone 13+ only),
+so earlier advice to set it to Standard doesn't apply to this device. On iPhone 13+ it
+only affects the stock Camera app anyway.
+
+Still true regardless: software matches color/tone, not optics — a phone can't
+reproduce a 1-inch sensor's depth of field or low-light character (see §8).
 
 ---
 
