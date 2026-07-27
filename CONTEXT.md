@@ -66,14 +66,18 @@ vibe-cam/
 
 Ids are shared between mobile (`filters.ts`) and backend (`grading.py` `CAMERAS`).
 
-| id | Camera | Look |
-|----|--------|------|
-| `g7x` | Canon G7X III | Warm, punchy, flattering skin tones |
-| `rx100` | Sony RX100 VII | Crisp, neutral, true-to-life |
-| `gr` | Ricoh GR III | High-contrast street, deep blacks |
-| `x100` | Fuji X100 | Classic Chrome — muted, documentary |
-| `ccd` | CCD Digicam | Y2K nostalgia — cool-green cast, noise |
-| `powershot` | Canon PowerShot | Retro party flash, punchy reds |
+| id | Camera | Look | Profile |
+|----|--------|------|---------|
+| `g7x` | Canon G7X III | Warm, punchy, flattering skin tones | reference |
+| `rx100` | Sony RX100 VII | Crisp, neutral, true-to-life | reference |
+| `gr` | Ricoh GR III | High-contrast street, deep blacks | reference |
+| `x100` | Fuji X100 | Classic Chrome — muted, documentary | reference |
+| `ccd` | CCD Digicam | Y2K nostalgia — cool-green cast, noise | parametric |
+| `powershot` | Canon PowerShot | Retro party flash, punchy reds | parametric |
+
+"reference" = a real-sample profile is committed, so `/grade` returns
+`X-Grade-Method: reference` (see §11 for coverage). "parametric" = hand-tuned only;
+these are generic aesthetics rather than one specific camera body.
 
 Two ways a look is produced:
 
@@ -168,26 +172,49 @@ HDR remain (see §8).
 - **Backend venv**: `C:\venv\vibe-cam` (Python 3.14 locally; has fastapi, numpy,
   opencv-python-headless, pillow, pytest). CI uses Python 3.11.
 - **Run backend**: `cd backend && uvicorn main:app --host 127.0.0.1 --port 8000 --reload` → health at `GET /127.0.0.1:8000/health`.
-- **Backend tests**: `cd backend && python -m pytest -q` → **31 passed**.
+- **Backend tests**: `cd backend && python -m pytest -q` → **38 passed**.
   ⚠️ Run from `backend/` (running from repo root also collects `references/**` test files, which error on missing deps).
 - **Mobile typecheck**: `cd mobile && npx tsc --noEmit` → clean.
 - **Mobile run**: `cd mobile && npm run ios` (or `android`).
-- **Env vars**: mobile `EXPO_PUBLIC_API_BASE_URL`; backend `VIBECAM_MAX_UPLOAD_BYTES`,
-  `VIBECAM_UPLOAD_TTL_MINUTES`; AI optional (`AI_PROVIDER`, `GOOGLE_AI_API_KEY`) —
-  not needed for camera/reference modes.
+- **Env vars**: mobile `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_API_KEY`; backend
+  `VIBECAM_MAX_UPLOAD_BYTES`, `VIBECAM_UPLOAD_TTL_MINUTES`, `VIBECAM_API_KEY`;
+  AI optional (`AI_PROVIDER`, `GOOGLE_AI_API_KEY`) — not needed for camera/reference modes.
+- **Auth**: `VIBECAM_API_KEY` set → all routes except `GET /health` need a matching
+  `X-API-Key` header (mobile sends it via `constants.authHeaders()`). Empty → open (local dev).
+- **Deploy / on-device**: see `docs/DEPLOY.md`.
 
 ---
 
 ## 11. Status & next steps
 
 **Done**: six emulations; `/cameras`; `X-Camera` wiring end-to-end; reference-matching
-engine + `check_samples.py` / `build_profile.py` + tests; docs. All merged to `main`,
-CI green, 31 backend tests passing, mobile typecheck clean.
+engine + `check_samples.py` / `build_profile.py` + tests; **real profiles built for
+`g7x`, `rx100`, `gr`, `x100`** (`ccd`/`powershot` stay parametric — generic looks with
+no single real camera to sample); native-safe grade I/O (`file://`, not web blobs);
+optional API-key gate; docs. All merged to `main`, CI green, 38 backend tests passing,
+mobile typecheck clean.
+
+**Profile coverage** (samples per scene, from DPReview SOOC galleries):
+
+| camera | skin | daylight | indoor | flash | source |
+|--------|------|----------|--------|-------|--------|
+| `g7x` | 0 | 23 | 5 | 2 | Canon G7X III gallery (full-res, EXIF verified) |
+| `rx100` | 3 | 14 | 1 | 2 | Sony RX100 VII gallery |
+| `gr` | 1 | 14 | 3 | 2 | Ricoh GR III gallery |
+| `x100` | 1 | 12 | 1 | 6 | Fujifilm X100VI gallery |
+
+Caveats: web-sized DPReview images have **EXIF stripped**, so rx100/gr/x100 were built
+with `verify_model=False` (camera confirmed from gallery metadata instead). `skin`
+buckets are thin — portraits mostly fall back to `overall`, which is daylight-dominated.
+`x100` reflects the X100VI's default SOOC rendering, not specifically Classic Chrome.
 
 **Next**:
-1. On the browser PC: gather G7X SOOC samples → `build_profile.py g7x` → commit `g7x.json`.
+1. **Deploy + run on a physical iPhone** (`docs/DEPLOY.md`) — nothing has been validated
+   on-device or against real photos yet. This is the highest-value remaining step.
 2. Tune per camera: blend strength, scene thresholds; consider matching in LAB.
 3. Let `auto` use reference profiles when available (currently explicit-only).
+4. Optional: fill `skin` buckets from hand-vetted Flickr portraits (strict model match,
+   unedited only); layer per-camera grain/vignette character (esp. `ccd`); `.cube` LUT I/O.
 4. Optionally layer each camera's grain/vignette *character* on top of the reference match (esp. `ccd`).
 5. Optional `.cube` 3D-LUT support (load/export).
 6. **Device testing + real-photo visual validation** (nothing has been run on a device yet — only unit tests + typecheck).

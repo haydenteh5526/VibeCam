@@ -138,12 +138,21 @@ optical traits (a 1-inch sensor's depth of field, low-light character) can't be 
 |----------|-------------|
 | `VIBECAM_MAX_UPLOAD_BYTES` | Max upload size |
 | `VIBECAM_UPLOAD_TTL_MINUTES` | Upload session TTL |
+| `VIBECAM_API_KEY` | Shared secret required in the `X-API-Key` header. Empty = open (local dev); **set it for any internet-reachable deploy** |
 
 ### Mobile (`mobile/.env`)
 
 | Variable | Description |
 |----------|-------------|
 | `EXPO_PUBLIC_API_BASE_URL` | Backend API URL |
+| `EXPO_PUBLIC_API_KEY` | Must match the backend's `VIBECAM_API_KEY` (empty for local dev) |
+
+## Authentication
+
+Every endpoint except `GET /health` requires an `X-API-Key` header **when the backend
+has `VIBECAM_API_KEY` set**. With it unset the API is open, which is convenient for
+local development and unsafe for a public URL. `/health` stays public so platform
+health checks (Render) keep working.
 
 ## Testing
 
@@ -156,7 +165,11 @@ python -m pytest -q
 
 ### Backend (Render)
 
-Blueprint defined in `render.yaml`. Push to deploy.
+Blueprint defined in `render.yaml`. Push to deploy. Set `VIBECAM_API_KEY` in the
+Render dashboard (declared `sync: false`, so no value lives in the repo).
+
+Full walkthrough for deploying and running on a physical iPhone, including
+recommended iOS camera settings: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
 ### Mobile (EAS Build)
 

@@ -1,5 +1,5 @@
 import { File, Paths } from 'expo-file-system';
-import { API_BASE_URL, CHUNK_SIZE } from '../constants';
+import { API_BASE_URL, CHUNK_SIZE, authHeaders } from '../constants';
 import { resolveFileSize } from '../utils';
 import type { SelectedFile, UploadInitResponse, UploadChunkResponse } from '../types';
 
@@ -29,7 +29,7 @@ async function saveImageResponse(response: Response): Promise<string> {
 export async function gradePhoto(uri: string, camera: string = 'auto'): Promise<{ gradedUri: string; presetId: string; presetName: string }> {
   const response = await fetch(`${API_BASE_URL}/grade`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream', 'X-Camera': camera },
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Camera': camera, ...authHeaders() },
     body: await readFileBytes(uri),
   });
   if (!response.ok) throw new Error(`Grading failed: ${response.status}`);
@@ -43,7 +43,7 @@ export async function gradePhoto(uri: string, camera: string = 'auto'): Promise<
 export async function gradeWithVibe(uri: string, vibe: string): Promise<{ gradedUri: string; styleName: string }> {
   const response = await fetch(`${API_BASE_URL}/grade/vibe`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream', 'X-Vibe': vibe },
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Vibe': vibe, ...authHeaders() },
     body: await readFileBytes(uri),
   });
   if (!response.ok) throw new Error(`Vibe grading failed: ${response.status}`);
@@ -56,7 +56,7 @@ export async function gradeWithVibe(uri: string, vibe: string): Promise<{ graded
 export async function guideComposition(uri: string): Promise<{ instructions: string[]; compositionTip: string }> {
   const response = await fetch(`${API_BASE_URL}/guide`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream' },
+    headers: { 'Content-Type': 'application/octet-stream', ...authHeaders() },
     body: await readFileBytes(uri),
   });
   if (!response.ok) throw new Error(`Guide failed: ${response.status}`);
@@ -71,7 +71,7 @@ export async function uploadFile(
   const sz = await resolveFileSize(file);
   const ir = await fetch(`${API_BASE_URL}/uploads/init`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ file_name: file.name, mime_type: file.mimeType, size_bytes: sz }),
   });
   if (!ir.ok) throw new Error(`Init failed: ${ir.status}`);
@@ -86,7 +86,7 @@ export async function uploadFile(
       if (chunk.length === 0) throw new Error('Read failed');
       const r = await fetch(`${API_BASE_URL}/uploads/${upload_id}/chunks?offset=${off}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
+        headers: { 'Content-Type': 'application/octet-stream', ...authHeaders() },
         body: chunk,
       });
       if (!r.ok) throw new Error(`Upload failed: ${r.status}`);
@@ -101,14 +101,14 @@ export async function uploadFile(
 }
 
 export async function fetchGallery() {
-  const r = await fetch(`${API_BASE_URL}/uploads?status=ingested`);
+  const r = await fetch(`${API_BASE_URL}/uploads?status=ingested`, { headers: authHeaders() });
   if (!r.ok) return [];
   return r.json();
 }
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const r = await fetch(`${API_BASE_URL}/health`);
+    const r = await fetch(`${API_BASE_URL}/health`, { headers: authHeaders() });
     return r.ok;
   } catch {
     return false;

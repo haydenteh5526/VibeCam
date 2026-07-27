@@ -19,6 +19,10 @@ Last updated: 2026-05-05
   - Local persistence for upload sessions (SQLite) and payload bytes (disk files)
   - SHA256 payload hash computed on ingestion completion and stored with session data
 - Backend .env.example provides VIBECAM_MAX_UPLOAD_BYTES and VIBECAM_UPLOAD_TTL_MINUTES defaults
+- VIBECAM_API_KEY gates every route except GET /health via an X-API-Key header; empty value
+  leaves the API open for local dev. Mobile sends it from EXPO_PUBLIC_API_KEY (see
+  constants.authHeaders). Declared sync: false in render.yaml so no value is committed.
+  Deploy + on-device runbook: docs/DEPLOY.md
 - backend/requirements.txt exists and is UTF-8/plain text
 - Repo-level Copilot workflow instructions now exist at .github/copilot-instructions.md
 - GitHub Actions workflows run backend tests and mobile typecheck on push/pull request
