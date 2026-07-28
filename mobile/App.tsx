@@ -4,9 +4,10 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { useCameraPermissions } from 'expo-camera';
 
-import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewScreen, CameraScreen, SettingsScreen } from './src/screens';
+import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewScreen, CameraScreen, SettingsScreen, RollScreen } from './src/screens';
 import { checkHealth, fetchGallery, uploadFile, gradePhoto } from './src/services/api';
 import { DEFAULT_SETTINGS, gradeHeaders, loadSettings, saveSettings, type Settings } from './src/settings';
+import { addEntry, loadRoll, pruneMissing, removeEntry, saveRoll, updateEntry, type RollEntry } from './src/rollStore';
 import type { AppScreen, GalleryItem, SelectedFile } from './src/types';
 import type { FilterId } from './src/filters';
 
@@ -33,11 +34,20 @@ export default function App() {
   const [grade, setGrade] = useState<GradeState>({ kind: 'none' });
   const [saved, setSaved] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [roll, setRoll] = useState<RollEntry[]>([]);
   // One seed per captured frame, so re-developing reproduces the same leak/dust/grain.
   const [seed, setSeed] = useState(0);
 
   useEffect(() => { checkHealth().then(setBackend); }, []);
   useEffect(() => { loadSettings().then(setSettings); }, []);
+  // Prune shots whose cached image iOS has since purged, so the roll has no dead tiles.
+  useEffect(() => { loadRoll().then(r => setRoll(pruneMissing(r))); }, []);
+
+  /** Update the roll and persist it. */
+  const commitRoll = useCallback((next: RollEntry[]) => {
+    setRoll(next);
+    void saveRoll(next);
+  }, []);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
     setSettings(prev => {
@@ -84,34 +94,61 @@ export default function App() {
 
     setGrade({ kind: 'grading' });
     try {
-      const { gradedUri, presetName } = await gradePhoto(uri, camera, gradeHeaders(settings, shotSeed));
+      const { gradedUri, presetId, presetName } = await gradePhoto(uri, camera, gradeHeaders(settings, shotSeed));
       setCaptured(gradedUri);
       setLastThumb(gradedUri);
       setFile({ ...f, uri: gradedUri });
       setGrade({ kind: 'graded', name: presetName });
       setSaved(settings.autoSave ? await saveToLibrary(gradedUri) : false);
+      commitRoll(addEntry(roll, {
+        uri: gradedUri,
+        originalUri: uri,
+        cameraId: presetId,
+        cameraName: presetName,
+        takenAt: Date.now(),
+        seed: shotSeed,
+      }));
     } catch {
       // Grading failed — keep the original and say so rather than pretending.
       setGrade({ kind: 'failed' });
       setSaved(settings.autoSave ? await saveToLibrary(uri) : false);
     }
-  }, [backend, saveToLibrary, settings]);
+  }, [backend, saveToLibrary, settings, roll, commitRoll]);
 
   /** Re-grade the original frame with another camera, from the preview screen. */
   const onRegrade = useCallback(async (camera: FilterId | 'auto') => {
     if (!original) return;
+    const previous = captured;
     setGrade({ kind: 'grading' }); setSaved(false);
     try {
-      const { gradedUri, presetName } = await gradePhoto(original, camera, gradeHeaders(settings, seed));
+      const { gradedUri, presetId, presetName } = await gradePhoto(original, camera, gradeHeaders(settings, seed));
       setCaptured(gradedUri);
       setLastThumb(gradedUri);
       setFile(prev => (prev ? { ...prev, uri: gradedUri } : prev));
       setGrade({ kind: 'graded', name: presetName });
       buzz(Haptics.ImpactFeedbackStyle.Light);
+      // Replace the roll entry in place so re-developing doesn't create duplicates.
+      commitRoll(previous
+        ? updateEntry(roll, previous, { uri: gradedUri, cameraId: presetId, cameraName: presetName })
+        : addEntry(roll, {
+            uri: gradedUri, originalUri: original, cameraId: presetId,
+            cameraName: presetName, takenAt: Date.now(), seed,
+          }));
     } catch {
       setGrade({ kind: 'failed' });
     }
-  }, [original, settings, seed, buzz]);
+  }, [original, captured, settings, seed, buzz, roll, commitRoll]);
+
+  /** Open a shot from the film roll, ready to re-develop. */
+  const onOpenRollEntry = useCallback((entry: RollEntry) => {
+    setCaptured(entry.uri);
+    setOriginal(entry.originalUri ?? entry.uri);
+    setSeed(entry.seed);
+    setFile({ uri: entry.uri, name: `IMG_${entry.takenAt}.jpg`, mimeType: 'image/jpeg', sizeBytes: null });
+    setGrade({ kind: 'graded', name: entry.cameraName });
+    setSaved(false);
+    setScreen('preview');
+  }, []);
 
   /** Explicit save from the preview screen (also used to retry a failed auto-save). */
   const onSave = useCallback(async () => {
@@ -149,6 +186,13 @@ export default function App() {
     setScreen('gallery');
   }, []);
 
+  /** Remove the current shot from the film roll and return to the camera. */
+  const onDelete = useCallback(() => {
+    if (captured) commitRoll(removeEntry(roll, captured));
+    setCaptured(null); setOriginal(null); setFile(null);
+    setGrade({ kind: 'none' }); setSaved(false); setScreen('camera');
+  }, [captured, roll, commitRoll]);
+
   const reset = useCallback(() => {
     setCaptured(null); setOriginal(null); setFile(null); setProgress(0); setHash(null);
     setGrade({ kind: 'none' }); setSaved(false); setScreen('camera');
@@ -157,6 +201,9 @@ export default function App() {
   if (!camPerm?.granted) return <PermissionScreen onAllow={requestCam} />;
   if (screen === 'settings') {
     return <SettingsScreen settings={settings} onChange={updateSettings} onClose={() => setScreen('camera')} />;
+  }
+  if (screen === 'roll') {
+    return <RollScreen roll={roll} onOpen={onOpenRollEntry} onBack={() => setScreen('camera')} />;
   }
   if (screen === 'gallery') return <GalleryScreen gallery={gallery} onBack={reset} />;
   if (screen === 'done') return <DoneScreen hash={hash} onGallery={onGallery} onNew={reset} />;
@@ -175,14 +222,14 @@ export default function App() {
         onSave={onSave}
         onShare={onShare}
         onUpload={onUpload}
-        onDelete={reset}
+        onDelete={onDelete}
       />
     );
   }
   return (
     <CameraScreen
       onCapture={onCapture}
-      onGallery={onGallery}
+      onGallery={() => setScreen('roll')}
       onSettings={() => setScreen('settings')}
       lastThumb={lastThumb}
       backendReady={backend}

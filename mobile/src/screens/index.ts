@@ -5,3 +5,4 @@ export { UploadingScreen } from './UploadingScreen';
 export { PreviewScreen } from './PreviewScreen';
 export { CameraScreen } from './CameraScreen';
 export { SettingsScreen } from './SettingsScreen';
+export { RollScreen } from './RollScreen';

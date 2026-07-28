@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LightSensor } from 'expo-sensors';
 import { CameraView, CameraType, FlashMode } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { FILTERS, type FilterId } from '../filters';
+import { CameraPicker } from '../components/CameraPicker';
 import { getRandomPose, type PoseSuggestion } from '../poses';
 import { guideComposition } from '../services/api';
 import type { Settings } from '../settings';
@@ -303,19 +304,8 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
         </View>
       )}
 
-      {/* Camera strip */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll} style={st.filterArea}>
-        <Pressable onPress={() => { setActiveFilter('auto'); buzz(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}>
-          <View style={[st.fDot, { backgroundColor: '#22c55e' }]} />
-          <Text style={[st.fChipT, activeFilter === 'auto' && st.fChipTA]}>Auto</Text>
-        </Pressable>
-        {FILTERS.filter(f => f.id !== 'original').map(f => (
-          <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); buzz(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}>
-            <View style={[st.fDot, { backgroundColor: f.dot }]} />
-            <Text style={[st.fChipT, activeFilter === f.id && st.fChipTA]}>{f.name}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      {/* Camera strip — stylised camera bodies rather than filter chips */}
+      <CameraPicker active={activeFilter} onSelect={id => { setActiveFilter(id); buzz(Haptics.ImpactFeedbackStyle.Light); }} />
       <Text style={st.camTag} numberOfLines={1}>{selectedName}</Text>
 
       {/* Which effects are armed — otherwise settings are invisible until after the shot */}
@@ -406,15 +396,7 @@ const st = StyleSheet.create({
   guideBtnT: { color: '#FFD60A', fontSize: 11, fontWeight: '600' },
   disabled: { opacity: 0.4 },
 
-  // Filter strip
-  filterArea: { maxHeight: 34, marginTop: 6 },
-  filterScroll: { paddingHorizontal: 12, gap: 5 },
-  fChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#1c1c1e', borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
-  fChipA: { backgroundColor: '#2c2c2e', borderColor: 'rgba(255,255,255,0.08)' },
-  fChipAuto: { backgroundColor: 'rgba(34,197,94,0.15)' },
-  fDot: { width: 8, height: 8, borderRadius: 4 },
-  fChipT: { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '600' },
-  fChipTA: { color: '#fff' },
+  // Camera picker caption (picker itself lives in components/CameraPicker)
   camTag: { color: '#8e8e93', fontSize: 10, textAlign: 'center', marginTop: 4, paddingHorizontal: 16 },
 
   // Shutter area
