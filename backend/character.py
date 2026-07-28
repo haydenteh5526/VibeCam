@@ -14,6 +14,8 @@ Pure numpy + Pillow — no new dependencies.
 
 from __future__ import annotations
 
+import zlib
+
 import numpy as np
 from PIL import Image, ImageFilter
 
@@ -182,19 +184,31 @@ def _corner_softness(arr: np.ndarray, radius: float) -> np.ndarray:
     return arr * (1 - w[:, :, None]) + blurred * w[:, :, None]
 
 
-def _grain(arr: np.ndarray, shadow: float, high: float, chroma: float) -> np.ndarray:
-    """Luminance-dependent sensor noise: strongest in shadows, plus colour speckle."""
+def _grain(arr: np.ndarray, shadow: float, high: float, chroma: float, seed: int) -> np.ndarray:
+    """Luminance-dependent sensor noise: strongest in shadows, plus colour speckle.
+
+    Seeded so that re-developing the same frame reproduces the same grain. Random noise
+    would make every re-grade subtly different, which breaks before/after comparison and
+    makes results impossible to reason about.
+    """
     if shadow <= 0 and high <= 0 and chroma <= 0:
         return arr
+    rng = np.random.default_rng(seed)
     h, w = arr.shape[:2]
     lum = _luma(arr) / 255.0
     # Noise gain falls off as the signal rises (shot noise is masked in highlights).
     gain = (shadow * (1.0 - lum) ** 1.5 + high * lum).astype(np.float32)
-    mono = np.random.normal(0.0, 1.0, (h, w)).astype(np.float32) * gain
+    mono = rng.standard_normal((h, w)).astype(np.float32) * gain
     out = arr + mono[:, :, None]
     if chroma > 0:
-        out = out + np.random.normal(0.0, chroma, (h, w, 3)).astype(np.float32)
+        out = out + (rng.standard_normal((h, w, 3)).astype(np.float32) * chroma)
     return out
+
+
+def _stable_seed(arr: np.ndarray, camera: str) -> int:
+    """Derive a seed from the image content, so identical input yields identical grain."""
+    sample = np.ascontiguousarray(arr[::37, ::37]).tobytes()
+    return zlib.crc32(sample) ^ zlib.crc32(camera.encode("utf-8"))
 
 
 def _vignette(arr: np.ndarray, strength: float) -> np.ndarray:
@@ -234,11 +248,14 @@ def apply_character(
     camera: str,
     scene: str | None = None,
     strength: float = 1.0,
+    seed: int | None = None,
 ) -> Image.Image:
     """Layer a camera's optical/sensor character over an already colour-graded image.
 
     `strength` scales the whole effect (0 = off, 1 = full) so it can be dialled back
     without re-tuning every parameter. Unknown cameras pass through untouched.
+    `seed` fixes the grain; when omitted it is derived from the image content, so the
+    same photo always develops identically.
     """
     p = _params_for(camera, scene)
     if p is None or strength <= 0:
@@ -246,6 +263,7 @@ def apply_character(
 
     s = float(np.clip(strength, 0.0, 1.5))
     arr = np.asarray(img.convert("RGB"), dtype=np.float32)
+    grain_seed = _stable_seed(arr, camera) if seed is None else int(seed)
 
     # Order matters: optical effects belong to the lens (before the sensor), noise and
     # sharpening belong to the sensor and its JPEG engine (after).
@@ -260,6 +278,6 @@ def apply_character(
         arr = arr * (1.0 - bl / 255.0) + bl
 
     arr = _sharpen(arr, p["sharpen"] * s)
-    arr = _grain(arr, p["grain_shadow"] * s, p["grain_high"] * s, p["chroma_noise"] * s)
+    arr = _grain(arr, p["grain_shadow"] * s, p["grain_high"] * s, p["chroma_noise"] * s, grain_seed)
 
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))

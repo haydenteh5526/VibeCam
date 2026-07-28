@@ -128,3 +128,40 @@ def test_highlight_rolloff_compresses_bright_values():
     out = _mean(character.apply_character(bright, "ccd"))
     # Rolloff should pull near-clipped values down rather than leaving them pinned.
     assert out.mean() < 250
+
+
+def test_character_is_deterministic():
+    """Re-developing the same frame must reproduce it exactly.
+
+    Regression guard: the grain originally used unseeded numpy randomness, so every
+    re-grade produced a subtly different image and before/after comparison was
+    meaningless.
+    """
+    src = _flat((115, 118, 122))
+    a = np.asarray(character.apply_character(src, "ccd"))
+    b = np.asarray(character.apply_character(src, "ccd"))
+    assert np.array_equal(a, b)
+
+
+def test_explicit_seed_changes_grain_pattern():
+    src = _flat((115, 118, 122))
+    a = np.asarray(character.apply_character(src, "ccd", seed=1))
+    b = np.asarray(character.apply_character(src, "ccd", seed=2))
+    assert not np.array_equal(a, b)
+
+
+def test_different_content_gets_different_grain():
+    """The derived seed depends on content, so two photos don't share a noise pattern."""
+    a = np.asarray(character.apply_character(_flat((100, 100, 100)), "ccd"))
+    b = np.asarray(character.apply_character(_flat((160, 160, 160)), "ccd"))
+    # Compare the noise residual rather than absolute values.
+    ra = a.astype(np.float64) - a.astype(np.float64).mean()
+    rb = b.astype(np.float64) - b.astype(np.float64).mean()
+    assert not np.array_equal(ra, rb)
+
+
+def test_strength_scales_the_effect():
+    src = _flat((120, 120, 120))
+    weak = np.asarray(character.apply_character(src, "ccd", strength=0.25), dtype=np.float64).std()
+    full = np.asarray(character.apply_character(src, "ccd", strength=1.0), dtype=np.float64).std()
+    assert weak < full

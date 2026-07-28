@@ -114,6 +114,21 @@ Select a look by sending the `X-Camera` header to `POST /grade`:
 | `auto` *(default)* | — | Scene analysis picks the best camera |
 | `ai` | — | AI-directed grade (if a provider is configured) |
 
+### Effects & intensity (optional headers on `POST /grade`)
+
+Point-and-shoot signatures, off unless requested. All are deterministic: pass the same
+`X-Seed` and a re-develop reproduces the identical leak, dust and grain.
+
+| Header | Values | Effect |
+|--------|--------|--------|
+| `X-Character` | `0`–`1.5` (default `1`) | Optical/sensor character intensity (bloom, vignette, noise, sharpening). `0` = colour only |
+| `X-Date-Stamp` | `1` / `on` | Burn an orange LED date into the corner, seven-segment style |
+| `X-Date-Text` | e.g. `'03 08 14` | Override the stamp text |
+| `X-Frame` | `white` \| `black` \| `print` | Printed border; `print` leaves a wide base like a photo-lab print |
+| `X-Light-Leak` | `0`–`1` | Warm light bleeding in from an edge |
+| `X-Dust` | `0`–`1` | Dust specks and hair-thin scratches |
+| `X-Seed` | integer | Fixes the random pattern so re-develops match |
+
 ### Accurate mode — match a real camera from samples
 
 The `X-Camera` looks above are hand-tuned approximations. For results grounded in
