@@ -80,6 +80,12 @@ test('normalize accepts every real camera id', () => {
   }
 });
 
+test('normalize handles the on-device look flag', () => {
+  assert.equal(normalize({}).onDeviceLook, false);
+  assert.equal(normalize({ onDeviceLook: true }).onDeviceLook, true);
+  assert.equal(normalize({ onDeviceLook: 'yes' }).onDeviceLook, false);
+});
+
 test('gradeHeaders always sends character strength and seed', () => {
   const h = gradeHeaders(DEFAULT_SETTINGS, 123);
   assert.equal(h['X-Character'], '1');
