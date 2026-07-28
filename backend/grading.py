@@ -439,6 +439,17 @@ def grade_image(image_bytes: bytes, preset_id: str | None = None) -> tuple[bytes
     if key not in _LOOKS:
         key = pick_best_camera(analyze_image(img))
     graded = apply_grade(img, key)
+
+    # Layer the camera's optical/sensor character on top of the colour grade, so the
+    # parametric path gets the same physicality as the reference path.
+    try:
+        from character import apply_character, has_character
+
+        if has_character(key):
+            graded = apply_character(graded, key)
+    except Exception:
+        pass  # character is an enhancement, never a hard dependency
+
     output = BytesIO()
     graded.save(output, format="JPEG", quality=92)
     return output.getvalue(), key, _LOOKS[key]["name"]

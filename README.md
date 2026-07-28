@@ -127,10 +127,16 @@ a **real** camera, teach the app from straight-out-of-camera (SOOC) sample JPEGs
    → writes `backend/camera_profiles/g7x.json` (small derived stats — safe to commit; the images stay local/git-ignored).
 
 Once a profile exists, `POST /grade` with that `X-Camera` maps your photo toward the
-real camera's color/tone using a scene-aware Monge–Kantorovich (MKL) color transfer,
-and reports `X-Grade-Method: reference`. Without a profile it falls back to the
-parametric preset (`X-Grade-Method: preset`). Color/tone can get convincingly close;
-optical traits (a 1-inch sensor's depth of field, low-light character) can't be reproduced from a phone frame.
+real camera's colour (per-channel mean/spread matching, deliberately not full
+covariance transport — see `CONTEXT.md` §7) and reports `X-Grade-Method: reference`.
+Without a profile it falls back to the parametric preset (`X-Grade-Method: preset`).
+
+Either way the result then passes through the **character layer** (`backend/character.py`),
+which adds what colour alone can't: highlight bloom/halation, lens vignette and corner
+softness, chromatic aberration, luminance-dependent sensor noise, and in-camera JPEG
+oversharpening. That physicality is what makes a shot read as "pocket camera" instead of
+"filter". Colour/tone plus character gets convincingly close; true optical traits
+(a 1-inch sensor's depth of field) can't be reproduced from a phone frame.
 
 ## Environment Variables
 

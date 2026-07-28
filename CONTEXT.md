@@ -140,11 +140,30 @@ Scene/portrait classification lives **server-side** only; the app no longer gues
 **Goal**: get color/tone genuinely close to a real camera by learning from its
 straight-out-of-camera (SOOC) JPEGs, instead of hand-tuned guesses.
 
-**Method** (`backend/camera_match.py`): build a per-scene **RGB mean + covariance**
-profile from samples; at grade time compute the photo's mean/cov and apply a
-**Monge–Kantorovich Linear (MKL)** optimal-transport transfer toward the profile,
-blended (~0.9). Scene is auto-classified into `skin | daylight | indoor | flash`
-(falls back to `overall`). Implemented in numpy — **no new dependencies**.
+**Method** — two layers, both applied on capture:
+
+1. **Colour** (`backend/camera_match.py`): build a per-scene **RGB mean + covariance**
+   profile from samples; at grade time match the photo's **per-channel** mean and spread
+   toward the profile, blended (~0.72), with the mean shift capped (±26) and ~60% of the
+   original luminance preserved.
+   ⚠️ **Deliberately not full-covariance MKL.** Textbook MKL transports the whole
+   covariance, which also *rotates hue*. Our profiles are built from whatever the sample
+   galleries photographed, so their covariance encodes **scene content** (foliage,
+   cityscapes) as much as camera colour science — transporting it produced violent
+   green/magenta casts on smooth skies. Per-channel matching can't rotate hue and
+   degrades gracefully when the reference is a poor match. The scene bucket is also
+   mixed 65/35 toward `overall` so a misclassified scene can't dictate the look.
+2. **Character** (`backend/character.py`): the part that actually reads as
+   "pocket camera" rather than "filter" — highlight rolloff, warm halation/bloom around
+   clipped highlights, radially-weighted chromatic aberration, corner softness, lens
+   vignette, luminance-dependent sensor noise + chroma speckle, and in-camera JPEG
+   oversharpening. Per-camera parameters in `CHARACTER`, modulated by scene
+   (`SCENE_MODIFIERS`: indoor = more gain/noise, flash = more bloom). Applies to **both**
+   grading paths, so `ccd`/`powershot` get it too. `apply_character(..., strength=)`
+   scales the whole effect.
+
+Scene is auto-classified into `skin | daylight | indoor | flash` (falls back to
+`overall`). Implemented in numpy + Pillow — **no new dependencies**.
 
 **Workflow**:
 1. Put SOOC JPEGs in `backend/camera_samples/<camera>/<scene>/`

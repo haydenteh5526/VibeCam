@@ -13,6 +13,34 @@ import type { SelectedFile } from '../types';
 const { width: W } = Dimensions.get('window');
 type FlashState = 'auto' | 'on' | 'off';
 
+// iOS reports physical lenses by AVFoundation device type. Mapping them to the
+// familiar magnification labels lets the UI behave like the stock Camera app:
+// tapping 1x selects the wide-angle lens outright instead of digitally zooming.
+const LENS_LABELS: { match: string; label: string; order: number }[] = [
+  { match: 'ultrawide', label: '0.5', order: 0 },
+  { match: 'wideangle', label: '1', order: 1 },
+  { match: 'telephoto', label: '2.5', order: 2 },
+];
+
+/** Default lens = the 1x wide-angle camera, matching expo-camera's own default. */
+const WIDE_LENS_HINT = 'wideangle';
+
+type LensOption = { name: string; label: string };
+
+function describeLenses(names: string[]): LensOption[] {
+  const out: LensOption[] = [];
+  for (const name of names) {
+    const key = name.toLowerCase().replace(/[^a-z]/g, '');
+    // Skip virtual/composite devices (dual, triple) — they re-introduce the
+    // ambiguous zoom behaviour we're trying to avoid by picking a physical lens.
+    if (key.includes('dual') || key.includes('triple')) continue;
+    const hit = LENS_LABELS.find(l => key.includes(l.match));
+    if (hit) out.push({ name, label: hit.label });
+  }
+  out.sort((a, b) => Number(a.label) - Number(b.label));
+  return out;
+}
+
 type Props = {
   onCapture: (file: SelectedFile, uri: string, camera: FilterId | 'auto') => void;
   onGallery: () => void;
@@ -37,6 +65,8 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
   const [aiGuide, setAiGuide] = useState<{ instructions: string[]; tip: string } | null>(null);
   const [guideLoading, setGuideLoading] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [lenses, setLenses] = useState<LensOption[]>([]);
+  const [lens, setLens] = useState<string | undefined>(undefined);
   const [err, setErr] = useState('');
   const cam = useRef<CameraView>(null);
   const shutterAnim = useRef(new Animated.Value(1)).current;
@@ -57,6 +87,25 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
       if (available) { sub = LightSensor.addListener(({ illuminance }) => { setLowLight(illuminance < 10); }); LightSensor.setUpdateInterval(2000); }
     }).catch(() => {});
     return () => { sub?.remove(); };
+  }, []);
+
+  const onCameraReady = useCallback(async () => {
+    setReady(true);
+    // Discover physical lenses so 1x means "the wide-angle lens", not a zoom guess.
+    try {
+      const names = (await cam.current?.getAvailableLensesAsync()) ?? [];
+      const opts = describeLenses(names);
+      setLenses(opts);
+      setLens(prev => prev ?? opts.find(o => o.name.toLowerCase().includes(WIDE_LENS_HINT))?.name);
+    } catch {
+      setLenses([]);   // Android / web: fall back to plain zoom behaviour
+    }
+  }, []);
+
+  const selectLens = useCallback((name: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLens(name);
+    setZoom(0);   // switching lens resets digital zoom, as the stock app does
   }, []);
 
   // Controls (each one maps to a real camera capability)
@@ -169,22 +218,42 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
         </View>
       )}
 
-      {/* Viewfinder */}
-      <View style={st.vfWrap}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={resetZoom}
-          onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })} onTouchEnd={onPinchEnd}>
-          <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} flash={flashMode} zoom={zoom}
-            mode="picture"
-            onCameraReady={() => setReady(true)} onMountError={e => setErr(e.message)} />
-          {previewFilter?.style.overlayColor && <View style={[st.overlay, { backgroundColor: previewFilter.style.overlayColor, opacity: previewFilter.style.overlayOpacity ?? 0.1 }]} pointerEvents="none" />}
-          {showGrid && <View style={st.grid} pointerEvents="none"><View style={[st.gl, { left: '33.3%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { left: '66.6%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { top: '33.3%', left: 0, right: 0, height: 1 }]} /><View style={[st.gl, { top: '66.6%', left: 0, right: 0, height: 1 }]} /></View>}
-          {showGuide && <View style={st.guideOval} pointerEvents="none" />}
-          <View style={st.crosshair} pointerEvents="none"><View style={st.crossH} /><View style={st.crossV} /></View>
-          {lowLight && <View style={st.hintBadge} pointerEvents="none"><Text style={st.hintT}>Low light — hold steady</Text></View>}
-          {zoom > 0 && <View style={st.zoomBadge} pointerEvents="none"><Text style={st.zoomT}>{`ZOOM ${Math.round(zoom * 100)}%  ·  tap to reset`}</Text></View>}
-          {countdown !== null && <View style={st.countBg}><Text style={st.countN}>{countdown}</Text></View>}
-          {flashAnimActive && <Animated.View style={[st.flashOver, { opacity: flashOpacity }]} pointerEvents="none" />}
-        </Pressable>
+      {/* Viewfinder — fixed 4:3 box so the preview frames exactly what gets captured.
+          A flex-filled box letterboxes or crops the sensor's 4:3 output, which is why
+          the framing looked wrong compared to the stock Camera app. */}
+      <View style={st.vfOuter}>
+        <View style={st.vfWrap}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={resetZoom}
+            onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })} onTouchEnd={onPinchEnd}>
+            <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} flash={flashMode} zoom={zoom}
+              mode="picture"
+              autofocus="on"
+              animateShutter={false}
+              selectedLens={lens}
+              onCameraReady={onCameraReady} onMountError={e => setErr(e.message)} />
+            {previewFilter?.style.overlayColor && <View style={[st.overlay, { backgroundColor: previewFilter.style.overlayColor, opacity: previewFilter.style.overlayOpacity ?? 0.1 }]} pointerEvents="none" />}
+            {showGrid && <View style={st.grid} pointerEvents="none"><View style={[st.gl, { left: '33.3%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { left: '66.6%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { top: '33.3%', left: 0, right: 0, height: 1 }]} /><View style={[st.gl, { top: '66.6%', left: 0, right: 0, height: 1 }]} /></View>}
+            {showGuide && <View style={st.guideOval} pointerEvents="none" />}
+            {lowLight && <View style={st.hintBadge} pointerEvents="none"><Text style={st.hintT}>Low light — hold steady</Text></View>}
+            {zoom > 0 && <View style={st.zoomBadge} pointerEvents="none"><Text style={st.zoomT}>{`ZOOM +${Math.round(zoom * 100)}%  ·  tap to reset`}</Text></View>}
+            {countdown !== null && <View style={st.countBg}><Text style={st.countN}>{countdown}</Text></View>}
+            {flashAnimActive && <Animated.View style={[st.flashOver, { opacity: flashOpacity }]} pointerEvents="none" />}
+          </Pressable>
+        </View>
+
+        {/* Lens switcher — real optical lenses, like the stock Camera app */}
+        {lenses.length > 1 && (
+          <View style={st.lensRow}>
+            {lenses.map(opt => {
+              const active = lens === opt.name && zoom === 0;
+              return (
+                <Pressable key={opt.name} onPress={() => selectLens(opt.name)} style={[st.lensPill, active && st.lensPillOn]}>
+                  <Text style={[st.lensT, active && st.lensTOn]}>{active ? `${opt.label}×` : opt.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {/* Pose / composition guide */}
@@ -271,14 +340,17 @@ const st = StyleSheet.create({
   setV: { color: '#fff', fontSize: 11, fontWeight: '600' },
   setVOn: { color: '#FFD60A' },
 
-  // Viewfinder
-  vfWrap: { flex: 1, margin: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a' },
+  // Viewfinder — fixed 4:3 (portrait 3:4) so preview == captured frame
+  vfOuter: { flex: 1, justifyContent: 'center' },
+  vfWrap: { width: W - 16, height: (W - 16) * (4 / 3), alignSelf: 'center', borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a' },
   overlay: { ...StyleSheet.absoluteFillObject },
   grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.2)' },
   guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' },
-  crosshair: { position: 'absolute', top: '50%', left: '50%', marginTop: -10, marginLeft: -10, width: 20, height: 20 },
-  crossH: { position: 'absolute', top: 9, left: 0, right: 0, height: 1, backgroundColor: '#FFD60A' },
-  crossV: { position: 'absolute', left: 9, top: 0, bottom: 0, width: 1, backgroundColor: '#FFD60A' },
+  lensRow: { flexDirection: 'row', alignSelf: 'center', marginTop: 10, backgroundColor: 'rgba(28,28,30,0.8)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', padding: 3, gap: 2 },
+  lensPill: { minWidth: 36, height: 36, paddingHorizontal: 8, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  lensPillOn: { backgroundColor: 'rgba(60,60,62,0.95)' },
+  lensT: { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '700' },
+  lensTOn: { color: '#FFD60A', fontSize: 12 },
   hintBadge: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   hintT: { color: '#FFD60A', fontSize: 10, fontWeight: '600' },
   zoomBadge: { position: 'absolute', bottom: 14, alignSelf: 'center', backgroundColor: 'rgba(28,28,30,0.8)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
