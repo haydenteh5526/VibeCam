@@ -236,8 +236,48 @@ reproduce a 1-inch sensor's depth of field or low-light character (see §8).
 engine + `check_samples.py` / `build_profile.py` + tests; **real profiles built for
 `g7x`, `rx100`, `gr`, `x100`** (`ccd`/`powershot` stay parametric — generic looks with
 no single real camera to sample); native-safe grade I/O (`file://`, not web blobs);
-optional API-key gate; docs. All merged to `main`, CI green, 38 backend tests passing,
-mobile typecheck clean.
+optional API-key gate; docs.
+
+**Premium app work (3 phases)**:
+- **Effects layer** (`backend/effects.py`) — seven-segment LED date stamp, printed frames,
+  edge light leaks, dust/scratches, all per-request via headers. Grading is now
+  **deterministic**: grain is seeded, so re-developing a shot reproduces it exactly.
+- **Settings** (`mobile/src/settings.ts` + `SettingsScreen`) — default camera, character
+  intensity, effects, saving behaviour, haptics, grid. Validated on load so a corrupt
+  file can't break the app. One seed per captured frame feeds the reproducibility above.
+- **Film roll** (`roll.ts` / `rollStore.ts` / `RollScreen`) — day-grouped grid of
+  developed shots; tap to re-develop from the retained original. Developing animation
+  and a camera-body picker replace the old chip strip.
+- **On-device look engine** (`mobile/src/look/`) — baked 3D LUTs (`backend/lut.py`,
+  `mobile/assets/luts/*.png`) applied in an expo-gl shader with rolloff, vignette and
+  grain. Capture is instant and works offline.
+- **Mobile test harness** — `tsx` + `node:test`, run in CI.
+
+**Test counts**: backend **117**, mobile **46**. Both run in CI alongside the typecheck.
+
+**Unmerged**: `feat/manual-controls-visioncamera` (PR #21, draft) migrates capture to
+react-native-vision-camera for real exposure compensation, true zoom factors and
+tap-to-focus. **Merging it ends Expo Go support** (EAS builds only), so it waits until
+Phases 1–2 are verified on hardware.
+
+**Known limits, stated plainly**:
+- **Nothing is verified on a physical device yet.** The GL look engine and the
+  VisionCamera screen are the largest untested surfaces.
+- On-device looks are an **approximation**: the adaptive reference match can't be baked
+  into a fixed LUT, and halation / chromatic aberration / corner softness need extra
+  render passes, so both stay server-side.
+- **Live look preview does not exist.** expo-camera has no native frame processor, and
+  doing it on VisionCamera needs a Skia frame processor (Phase 3b).
+- No manual **ISO, shutter or white balance** anywhere — neither expo-camera nor
+  VisionCamera 4 exposes them; that would need a custom native module.
+- `skin` sample buckets are thin, so portraits lean on `overall`.
+
+**Next**:
+1. **Test Phases 1–2 on the iPhone via Expo Go** (`npm run go:tunnel`) — see `docs/DEPLOY.md`.
+2. Then merge PR #21 and do an EAS development build for the manual controls.
+3. Phase 3b: live look preview via a Skia frame processor.
+4. Tune per camera once real photos exist: blend strength, scene thresholds, character
+   intensity, effect taste.
 
 **Profile coverage** (samples per scene, from DPReview SOOC galleries):
 
