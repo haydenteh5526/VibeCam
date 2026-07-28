@@ -109,3 +109,8 @@ backend/camera_samples/**/*.jpeg
 backend/camera_samples/**/*.png
 backend/camera_samples/**/*.heic
 !backend/camera_samples/**/.gitkeep
+
+# Baked .cube LUTs are derived artefacts (~134 KB each). Regenerate with
+# `cd backend && python tools/build_luts.py`. The small PNG strips under
+# mobile/assets/luts ARE committed, because the app bundle ships them.
+backend/luts/

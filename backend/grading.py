@@ -368,7 +368,14 @@ def pick_best_camera(analysis: dict) -> str:
 
 # ─── Main Pipeline ─────────────────────────────────────────────────────────────
 
-def apply_grade(img: Image.Image, preset_id: str) -> Image.Image:
+def apply_grade(img: Image.Image, preset_id: str, spatial: bool = True) -> Image.Image:
+    """Apply a look to an image.
+
+    spatial=False skips effects that depend on pixel position or randomness (grain,
+    vignette), leaving a pure per-pixel colour mapping. That mode is what LUT baking
+    needs: a 3D LUT maps one input colour to one output colour, so anything positional
+    has to be excluded and applied separately.
+    """
     p = _LOOKS[preset_id]
     img = img.convert("RGB")
     arr = np.array(img, dtype=np.float32)
@@ -401,11 +408,13 @@ def apply_grade(img: Image.Image, preset_id: str) -> Image.Image:
     # 7. HSL mixer (target specific hues)
     arr = _apply_hsl_mixer(arr, p["hsl"])
 
-    # 8. Grain
-    arr = _add_grain(arr, p["grain"])
+    # 8. Grain — spatial/random, so excluded when baking a LUT
+    if spatial:
+        arr = _add_grain(arr, p["grain"])
 
-    # 9. Vignette
-    arr = _add_vignette(arr, p["vignette"])
+    # 9. Vignette — depends on pixel position, so excluded when baking a LUT
+    if spatial:
+        arr = _add_vignette(arr, p["vignette"])
 
     arr = np.clip(arr, 0, 255).astype(np.uint8)
     result = Image.fromarray(arr)
