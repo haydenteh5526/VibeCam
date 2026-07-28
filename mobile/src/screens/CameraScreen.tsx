@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { FILTERS, type FilterId } from '../filters';
 import { getRandomPose, type PoseSuggestion } from '../poses';
 import { guideComposition } from '../services/api';
+import type { Settings } from '../settings';
 import type { SelectedFile } from '../types';
 
 const { width: W } = Dimensions.get('window');
@@ -44,22 +45,24 @@ function describeLenses(names: string[]): LensOption[] {
 type Props = {
   onCapture: (file: SelectedFile, uri: string, camera: FilterId | 'auto') => void;
   onGallery: () => void;
+  onSettings: () => void;
   lastThumb: string | null;
   backendReady: boolean;
+  settings: Settings;
 };
 
-export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: Props) {
+export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, backendReady, settings }: Props) {
   const [facing, setFacing] = useState<CameraType>('back');
   const [flashState, setFlashState] = useState<FlashState>('auto');
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(0);
   const [timer, setTimer] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [showGrid, setShowGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(settings.grid);
   const [showSettings, setShowSettings] = useState(false);
   const [flashAnimActive, setFlashAnimActive] = useState(false);
   const [lowLight, setLowLight] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<FilterId | 'auto'>('auto');
+  const [activeFilter, setActiveFilter] = useState<FilterId | 'auto'>(settings.defaultCamera);
   const [showGuide, setShowGuide] = useState(false);
   const [currentPose, setCurrentPose] = useState<PoseSuggestion>(getRandomPose('portrait'));
   const [aiGuide, setAiGuide] = useState<{ instructions: string[]; tip: string } | null>(null);
@@ -76,6 +79,11 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
   const lastDist = useRef<number | null>(null);
 
   const flashMode: FlashMode = flashState === 'auto' ? 'auto' : flashState === 'on' ? 'on' : 'off';
+
+  /** Haptic feedback that respects the user's setting. */
+  const buzz = useCallback(async (style: Haptics.ImpactFeedbackStyle) => {
+    if (settings.haptics) await Haptics.impactAsync(style);
+  }, [settings.haptics]);
 
   useEffect(() => { Animated.timing(fadeIn, { toValue: 1, duration: 400, useNativeDriver: true }).start(); }, [fadeIn]);
   useEffect(() => { Animated.loop(Animated.sequence([Animated.timing(shutterGlow, { toValue: 0.5, duration: 1200, useNativeDriver: true }), Animated.timing(shutterGlow, { toValue: 0, duration: 1200, useNativeDriver: true })])).start(); }, [shutterGlow]);
@@ -103,24 +111,24 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
   }, []);
 
   const selectLens = useCallback((name: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    buzz(Haptics.ImpactFeedbackStyle.Light);
     setLens(name);
     setZoom(0);   // switching lens resets digital zoom, as the stock app does
-  }, []);
+  }, [buzz]);
 
   // Controls (each one maps to a real camera capability)
-  const cycleFlash = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setFlashState(f => f === 'auto' ? 'on' : f === 'on' ? 'off' : 'auto'); }, []);
-  const flip = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setFacing(f => f === 'back' ? 'front' : 'back'); }, []);
-  const cycleTimer = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTimer(t => t === 0 ? 3 : t === 3 ? 10 : 0); }, []);
-  const toggleGrid = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowGrid(g => !g); }, []);
+  const cycleFlash = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setFlashState(f => f === 'auto' ? 'on' : f === 'on' ? 'off' : 'auto'); }, [buzz]);
+  const flip = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Medium); setFacing(f => f === 'back' ? 'front' : 'back'); }, [buzz]);
+  const cycleTimer = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setTimer(t => t === 0 ? 3 : t === 3 ? 10 : 0); }, [buzz]);
+  const toggleGrid = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setShowGrid(g => !g); }, [buzz]);
   const toggleGuide = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    buzz(Haptics.ImpactFeedbackStyle.Light);
     setShowGuide(g => {
       if (!g) { setCurrentPose(getRandomPose('portrait')); setAiGuide(null); }
       return !g;
     });
-  }, []);
-  const nextPose = useCallback(() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setCurrentPose(getRandomPose('portrait')); }, []);
+  }, [buzz]);
+  const nextPose = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setCurrentPose(getRandomPose('portrait')); }, [buzz]);
 
   const requestAiGuide = useCallback(async () => {
     if (!cam.current || !ready || !backendReady) return;
@@ -145,7 +153,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
     lastDist.current = d;
   }, []);
   const onPinchEnd = useCallback(() => { lastDist.current = null; }, []);
-  const resetZoom = useCallback(() => { if (zoom !== 0) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setZoom(0); } }, [zoom]);
+  const resetZoom = useCallback(() => { if (zoom !== 0) { buzz(Haptics.ImpactFeedbackStyle.Light); setZoom(0); } }, [zoom, buzz]);
 
   const onPressIn = useCallback(() => { Animated.spring(shutterAnim, { toValue: 0.88, useNativeDriver: true }).start(); }, [shutterAnim]);
   const onPressOut = useCallback(() => { Animated.spring(shutterAnim, { toValue: 1, friction: 4, useNativeDriver: true }).start(); }, [shutterAnim]);
@@ -155,7 +163,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
     if (!cam.current || !ready || capturing) return;
     setCapturing(true);
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await buzz(Haptics.ImpactFeedbackStyle.Medium);
       triggerFlash();
       const p = await cam.current.takePictureAsync({ quality: 0.95 });
       if (!p?.uri) return;
@@ -173,7 +181,7 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
     } finally {
       setCapturing(false);
     }
-  }, [ready, capturing, onCapture, triggerFlash, activeFilter]);
+  }, [ready, capturing, onCapture, triggerFlash, activeFilter, buzz]);
 
   const onShutter = useCallback(() => {
     if (timer === 0) { doCapture(); return; }
@@ -192,6 +200,15 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
   // decision is made server-side from the full-resolution pixels.
   const previewFilter = activeFilter === 'auto' ? undefined : FILTERS.find(f => f.id === activeFilter);
 
+  // Surfaced on the capture screen so armed effects aren't a surprise after the shot.
+  const activeEffects: string[] = [];
+  if (settings.dateStamp) activeEffects.push('DATE');
+  if (settings.frame !== 'none') activeEffects.push(settings.frame.toUpperCase() + ' FRAME');
+  if (settings.lightLeak > 0) activeEffects.push('LEAK');
+  if (settings.dust > 0) activeEffects.push('DUST');
+  if (settings.characterStrength === 0) activeEffects.push('COLOUR ONLY');
+  else if (settings.characterStrength >= 1.25) activeEffects.push('HEAVY CHARACTER');
+
   return (
     <Animated.View style={[st.bg, { opacity: fadeIn }]}><StatusBar style="light" />
 
@@ -209,12 +226,18 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
         </Pressable>
       </View>
 
-      {/* Settings panel — only controls that actually do something */}
+      {/* Quick panel — only controls that actually do something */}
       {showSettings && (
         <View style={st.setPanel}>
           <Pressable onPress={cycleFlash} style={st.setItem}><Text style={st.setL}>Flash</Text><Text style={[st.setV, flashState !== 'off' && st.setVOn]}>{flashState === 'auto' ? 'Auto' : flashState === 'on' ? 'On' : 'Off'}</Text></Pressable>
           <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={[st.setV, timer > 0 && st.setVOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
           <Pressable onPress={toggleGrid} style={st.setItem}><Text style={st.setL}>Grid</Text><Text style={[st.setV, showGrid && st.setVOn]}>{showGrid ? 'On' : 'Off'}</Text></Pressable>
+          <Pressable
+            onPress={() => { setShowSettings(false); onSettings(); }}
+            style={[st.setItem, st.setItemWide]}
+          >
+            <Text style={st.setL}>More</Text><Text style={st.setVOn}>All settings ›</Text>
+          </Pressable>
         </View>
       )}
 
@@ -282,18 +305,27 @@ export function CameraScreen({ onCapture, onGallery, lastThumb, backendReady }: 
 
       {/* Camera strip */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterScroll} style={st.filterArea}>
-        <Pressable onPress={() => { setActiveFilter('auto'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}>
+        <Pressable onPress={() => { setActiveFilter('auto'); buzz(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === 'auto' && st.fChipAuto]}>
           <View style={[st.fDot, { backgroundColor: '#22c55e' }]} />
           <Text style={[st.fChipT, activeFilter === 'auto' && st.fChipTA]}>Auto</Text>
         </Pressable>
         {FILTERS.filter(f => f.id !== 'original').map(f => (
-          <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}>
+          <Pressable key={f.id} onPress={() => { setActiveFilter(f.id); buzz(Haptics.ImpactFeedbackStyle.Light); }} style={[st.fChip, activeFilter === f.id && st.fChipA]}>
             <View style={[st.fDot, { backgroundColor: f.dot }]} />
             <Text style={[st.fChipT, activeFilter === f.id && st.fChipTA]}>{f.name}</Text>
           </Pressable>
         ))}
       </ScrollView>
       <Text style={st.camTag} numberOfLines={1}>{selectedName}</Text>
+
+      {/* Which effects are armed — otherwise settings are invisible until after the shot */}
+      {activeEffects.length > 0 && (
+        <View style={st.fxRow}>
+          {activeEffects.map(tag => (
+            <View key={tag} style={st.fxTag}><Text style={st.fxTagT}>{tag}</Text></View>
+          ))}
+        </View>
+      )}
 
       {/* Shutter */}
       <View style={st.shutterArea}>
@@ -338,7 +370,11 @@ const st = StyleSheet.create({
   setItem: { width: '33%', paddingVertical: 10, alignItems: 'center' },
   setL: { color: '#636366', fontSize: 9, fontWeight: '500', marginBottom: 2 },
   setV: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  setVOn: { color: '#FFD60A' },
+  setVOn: { color: '#FFD60A', fontSize: 11, fontWeight: '600' },
+  setItemWide: { width: '100%', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', marginTop: 4, paddingTop: 10 },
+  fxRow: { flexDirection: 'row', alignSelf: 'center', gap: 5, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 16 },
+  fxTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: 'rgba(255,214,10,0.14)', borderWidth: 1, borderColor: 'rgba(255,214,10,0.3)' },
+  fxTagT: { color: '#FFD60A', fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
 
   // Viewfinder — fixed 4:3 (portrait 3:4) so preview == captured frame
   vfOuter: { flex: 1, justifyContent: 'center' },

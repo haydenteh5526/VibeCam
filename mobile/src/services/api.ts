@@ -26,10 +26,19 @@ async function saveImageResponse(response: Response): Promise<string> {
   return out.uri;
 }
 
-export async function gradePhoto(uri: string, camera: string = 'auto'): Promise<{ gradedUri: string; presetId: string; presetName: string }> {
+export async function gradePhoto(
+  uri: string,
+  camera: string = 'auto',
+  extraHeaders: Record<string, string> = {},
+): Promise<{ gradedUri: string; presetId: string; presetName: string }> {
   const response = await fetch(`${API_BASE_URL}/grade`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream', 'X-Camera': camera, ...authHeaders() },
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-Camera': camera,
+      ...extraHeaders,
+      ...authHeaders(),
+    },
     body: await readFileBytes(uri),
   });
   if (!response.ok) throw new Error(`Grading failed: ${response.status}`);
