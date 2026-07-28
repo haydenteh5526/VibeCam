@@ -68,10 +68,18 @@ option from Windows.
 ```bash
 cd mobile
 npm install
-npx expo start
+npm run go            # same Wi-Fi
+npm run go:tunnel     # phone on mobile data / different network
 ```
 
 Install **Expo Go** from the App Store, then scan the QR code with the iPhone camera.
+
+> **The `--go` flag matters.** `expo-dev-client` is a dependency, so plain
+> `npx expo start` defaults to *development build* mode and prints a QR encoding
+> `exp+vibecam://expo-development-client/?url=…`. Expo Go cannot open that URL — you
+> need a custom dev build for it. The tell is `› Using development build` in the
+> output. Either use `--go` (as the scripts above do) or press **`s`** in the running
+> dev server to switch to Expo Go, which reprints the QR as `exp://…`.
 Phone and PC must be on the same Wi-Fi.
 
 #### Phone not on the same network (mobile data, guest Wi-Fi, office network)
@@ -87,6 +95,18 @@ npx expo start --tunnel
 prompt. The bundle is relayed through a public URL, so the phone can be on mobile data
 or any other network. It's slower to load and hot-reload than LAN — prefer plain
 `npx expo start` when both devices share Wi-Fi.
+
+**Tunnels drop.** `Tunnel connection has been closed … related to intermittent
+connection issues between the dev server and ngrok` is common and usually not your
+fault. In order of effort:
+
+1. Restart the dev server (`Ctrl+C`, then `npm run go:tunnel`). Most drops clear.
+2. Check <https://status.ngrok.com/> for an actual outage.
+3. Add `-c` to clear the bundler cache if reloads then behave oddly:
+   `npx expo start --tunnel --go -c`
+4. If tunnels keep collapsing mid-session, the robust fix is to stop depending on the
+   dev server: put the phone on the same Wi-Fi and use `npm run go`, or build a
+   standalone app with EAS (below), which needs no dev server at all.
 
 Tunnel mode only covers the **dev server**. A backend on `http://<LAN-IP>:8000` is
 still unreachable from another network, so pair tunnel mode with the deployed Render
