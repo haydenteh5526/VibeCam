@@ -27,3 +27,8 @@ jobs:
         working-directory: mobile
         run: |
           npx tsc --noEmit
+
+      - name: Unit tests
+        working-directory: mobile
+        run: |
+          npm test
