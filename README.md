@@ -14,14 +14,15 @@
 ## Features
 
 - **Pocket Camera Emulation** — Reproduces the in-camera color science of popular point-and-shoot cameras: Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100 (Classic Chrome), Y2K CCD digicam, and Canon PowerShot
+- **Camera Character** — Highlight bloom, lens vignette, corner softness, chromatic aberration and luminance-dependent sensor grain, so results read as a camera rather than a filter
+- **Point-and-shoot Effects** — LED date stamp, printed frames, light leaks, dust and scratches. Deterministic: the same shot re-develops identically
+- **On-device Developing** — Baked 3D LUTs applied on the GPU, so capture is instant and works offline
+- **Film Roll** — In-app roll of developed shots; tap any shot to re-develop it with a different camera
+- **Settings** — Default camera, character intensity, effects, auto-save, keep-original, haptics, grid
 - **Auto Camera Match** — The backend analyzes the captured pixels and picks the best-fitting camera
-- **Photo Capture** — Point-and-shoot capture with flash, timer, grid, pinch zoom and pose guidance
-- **Graded Photos Saved Automatically** — The emulated result is written to your camera roll
-- **Re-develop After the Shot** — Tap any camera in the preview to re-grade the same frame; hold to compare against the untouched original
 - **Vibe Grading** — Optional AI color grade from a text prompt (e.g. "warm nostalgic sunset")
-- **File Upload** — Select files from device with resumable chunked uploads
 - **Cross-Platform** — iOS and Android via Expo
-- **CI/CD** — GitHub Actions for backend tests and mobile typechecks
+- **CI/CD** — GitHub Actions for backend tests, mobile unit tests and typechecks
 
 ## Tech Stack
 
@@ -180,8 +181,22 @@ health checks (Render) keep working.
 ## Testing
 
 ```bash
+# Backend
 cd backend
-python -m pytest -q
+python -m pytest -q          # 117 tests
+
+# Mobile
+cd mobile
+npm test                     # 46 tests (tsx + node:test)
+npm run typecheck
+```
+
+Baked LUT assets must stay in sync with the camera parameters. After changing any
+camera's colour values, regenerate them — a test fails if they go stale:
+
+```bash
+cd backend
+python tools/build_luts.py
 ```
 
 ## Deployment
