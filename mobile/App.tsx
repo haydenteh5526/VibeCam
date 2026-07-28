@@ -4,8 +4,9 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { useCameraPermissions } from 'expo-camera';
 
-import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewScreen, CameraScreen } from './src/screens';
+import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewScreen, CameraScreen, SettingsScreen } from './src/screens';
 import { checkHealth, fetchGallery, uploadFile, gradePhoto } from './src/services/api';
+import { DEFAULT_SETTINGS, gradeHeaders, loadSettings, saveSettings, type Settings } from './src/settings';
 import type { AppScreen, GalleryItem, SelectedFile } from './src/types';
 import type { FilterId } from './src/filters';
 
@@ -31,8 +32,24 @@ export default function App() {
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [grade, setGrade] = useState<GradeState>({ kind: 'none' });
   const [saved, setSaved] = useState(false);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  // One seed per captured frame, so re-developing reproduces the same leak/dust/grain.
+  const [seed, setSeed] = useState(0);
 
   useEffect(() => { checkHealth().then(setBackend); }, []);
+  useEffect(() => { loadSettings().then(setSettings); }, []);
+
+  const updateSettings = useCallback((patch: Partial<Settings>) => {
+    setSettings(prev => {
+      const next = { ...prev, ...patch };
+      void saveSettings(next);
+      return next;
+    });
+  }, []);
+
+  const buzz = useCallback((style: Haptics.ImpactFeedbackStyle) => {
+    if (settings.haptics) void Haptics.impactAsync(style);
+  }, [settings.haptics]);
 
   /** Write a finished image to the device photo library. Returns true on success. */
   const saveToLibrary = useCallback(async (uri: string): Promise<boolean> => {
@@ -50,57 +67,63 @@ export default function App() {
   // Photo captured -> apply the selected pocket-camera emulation, then save the
   // *graded* result to the camera roll (that's the photo the user actually wants).
   const onCapture = useCallback(async (f: SelectedFile, uri: string, camera: FilterId | 'auto') => {
+    const shotSeed = Math.floor(Math.random() * 1_000_000);
+    setSeed(shotSeed);
     setFile(f); setCaptured(uri); setOriginal(uri); setSaved(false);
     setLastThumb(uri);
     setScreen('preview');
 
+    if (settings.saveOriginal) void saveToLibrary(uri);
+
     if (!backend) {
       // No backend: the untouched capture is all we have, so keep it.
       setGrade({ kind: 'none' });
-      setSaved(await saveToLibrary(uri));
+      setSaved(settings.autoSave ? await saveToLibrary(uri) : false);
       return;
     }
 
     setGrade({ kind: 'grading' });
     try {
-      const { gradedUri, presetName } = await gradePhoto(uri, camera);
+      const { gradedUri, presetName } = await gradePhoto(uri, camera, gradeHeaders(settings, shotSeed));
       setCaptured(gradedUri);
       setLastThumb(gradedUri);
       setFile({ ...f, uri: gradedUri });
       setGrade({ kind: 'graded', name: presetName });
-      setSaved(await saveToLibrary(gradedUri));
+      setSaved(settings.autoSave ? await saveToLibrary(gradedUri) : false);
     } catch {
       // Grading failed — keep the original and say so rather than pretending.
       setGrade({ kind: 'failed' });
-      setSaved(await saveToLibrary(uri));
+      setSaved(settings.autoSave ? await saveToLibrary(uri) : false);
     }
-  }, [backend, saveToLibrary]);
+  }, [backend, saveToLibrary, settings]);
 
   /** Re-grade the original frame with another camera, from the preview screen. */
   const onRegrade = useCallback(async (camera: FilterId | 'auto') => {
     if (!original) return;
     setGrade({ kind: 'grading' }); setSaved(false);
     try {
-      const { gradedUri, presetName } = await gradePhoto(original, camera);
+      const { gradedUri, presetName } = await gradePhoto(original, camera, gradeHeaders(settings, seed));
       setCaptured(gradedUri);
       setLastThumb(gradedUri);
       setFile(prev => (prev ? { ...prev, uri: gradedUri } : prev));
       setGrade({ kind: 'graded', name: presetName });
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      buzz(Haptics.ImpactFeedbackStyle.Light);
     } catch {
       setGrade({ kind: 'failed' });
     }
-  }, [original]);
+  }, [original, settings, seed, buzz]);
 
   /** Explicit save from the preview screen (also used to retry a failed auto-save). */
   const onSave = useCallback(async () => {
     if (!file) return;
     const ok = await saveToLibrary(file.uri);
     setSaved(ok);
-    await Haptics.notificationAsync(
-      ok ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
-    );
-  }, [file, saveToLibrary]);
+    if (settings.haptics) {
+      await Haptics.notificationAsync(
+        ok ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
+      );
+    }
+  }, [file, saveToLibrary, settings.haptics]);
 
   const onShare = useCallback(async () => {
     if (!file || !(await Sharing.isAvailableAsync())) return;
@@ -113,13 +136,13 @@ export default function App() {
     setScreen('uploading'); setProgress(0); setHash(null);
     try {
       const h = await uploadFile(file, setProgress);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (settings.haptics) await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setHash(h); setScreen('done');
     } catch {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (settings.haptics) await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setScreen('preview');
     }
-  }, [file]);
+  }, [file, settings.haptics]);
 
   const onGallery = useCallback(async () => {
     try { const items = await fetchGallery(); setGallery(items); } catch { setGallery([]); }
@@ -132,6 +155,9 @@ export default function App() {
   }, []);
 
   if (!camPerm?.granted) return <PermissionScreen onAllow={requestCam} />;
+  if (screen === 'settings') {
+    return <SettingsScreen settings={settings} onChange={updateSettings} onClose={() => setScreen('camera')} />;
+  }
   if (screen === 'gallery') return <GalleryScreen gallery={gallery} onBack={reset} />;
   if (screen === 'done') return <DoneScreen hash={hash} onGallery={onGallery} onNew={reset} />;
   if (screen === 'uploading') return <UploadingScreen progress={progress} />;
@@ -153,5 +179,14 @@ export default function App() {
       />
     );
   }
-  return <CameraScreen onCapture={onCapture} onGallery={onGallery} lastThumb={lastThumb} backendReady={backend} />;
+  return (
+    <CameraScreen
+      onCapture={onCapture}
+      onGallery={onGallery}
+      onSettings={() => setScreen('settings')}
+      lastThumb={lastThumb}
+      backendReady={backend}
+      settings={settings}
+    />
+  );
 }

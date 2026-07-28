@@ -33,4 +33,4 @@ export type SelectedFile = {
   sizeBytes: number | null;
 };
 
-export type AppScreen = 'camera' | 'preview' | 'uploading' | 'done' | 'gallery';
+export type AppScreen = 'camera' | 'preview' | 'uploading' | 'done' | 'gallery' | 'settings';
