@@ -268,8 +268,12 @@ def _apply_skin_vibrance(img: Image.Image, vibrance: float) -> Image.Image:
 
 
 def _add_grain(arr: np.ndarray, amount: float) -> np.ndarray:
+    """Add film grain. Seeded from the image content so a re-grade reproduces exactly."""
     if amount <= 0: return arr
-    noise = np.random.normal(0, amount, arr.shape).astype(np.float32)
+    import zlib
+    seed = zlib.crc32(np.ascontiguousarray(arr[::37, ::37]).astype(np.float32).tobytes())
+    rng = np.random.default_rng(seed)
+    noise = (rng.standard_normal(arr.shape) * amount).astype(np.float32)
     return arr + noise
 
 
@@ -426,12 +430,19 @@ def apply_grade(img: Image.Image, preset_id: str) -> Image.Image:
     return result
 
 
-def grade_image(image_bytes: bytes, preset_id: str | None = None) -> tuple[bytes, str, str]:
+def grade_image(
+    image_bytes: bytes,
+    preset_id: str | None = None,
+    character_strength: float = 1.0,
+    fx=None,
+) -> tuple[bytes, str, str]:
     """Grade an image with a specific camera/film look, or auto-pick a camera.
 
     preset_id:
       - a known camera id (e.g. "g7x") or film id (e.g. "kodak_gold") -> that look
       - None / "" / "auto" / unknown  -> analyze the pixels and auto-pick a camera
+    character_strength: scales the optical/sensor character layer (0 disables it).
+    fx: optional effects.EffectOptions for date stamp / frame / leak / dust.
     Returns (jpeg_bytes, resolved_id, display_name).
     """
     img = Image.open(BytesIO(image_bytes))
@@ -445,10 +456,18 @@ def grade_image(image_bytes: bytes, preset_id: str | None = None) -> tuple[bytes
     try:
         from character import apply_character, has_character
 
-        if has_character(key):
-            graded = apply_character(graded, key)
+        if has_character(key) and character_strength > 0:
+            graded = apply_character(graded, key, None, strength=character_strength)
     except Exception:
         pass  # character is an enhancement, never a hard dependency
+
+    if fx is not None:
+        try:
+            from effects import apply_effects
+
+            graded = apply_effects(graded, key, fx)
+        except Exception:
+            pass
 
     output = BytesIO()
     graded.save(output, format="JPEG", quality=92)

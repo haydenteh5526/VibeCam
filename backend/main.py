@@ -348,6 +348,61 @@ def _validate_binary_content_type(request: Request) -> None:
         )
 
 
+def _header_float(request: Request, name: str, default: float, lo: float, hi: float) -> float:
+    """Read a bounded float header, ignoring anything unparseable."""
+    raw = request.headers.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return max(lo, min(hi, float(raw)))
+    except ValueError:
+        return default
+
+
+def _header_bool(request: Request, name: str) -> bool:
+    return (request.headers.get(name, "") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+_ALLOWED_FRAMES = {"white", "black", "print"}
+
+
+def _effect_options(request: Request):
+    """Build effects.EffectOptions from request headers, or None when nothing is asked for.
+
+    Headers (all optional):
+      X-Date-Stamp: 1 | on            burn an LED date into the corner
+      X-Date-Text:  '03 08 14         override the stamp text
+      X-Frame:      white|black|print printed border
+      X-Light-Leak: 0..1
+      X-Dust:       0..1
+      X-Seed:       int               keeps leak/dust identical when re-developing
+    """
+    from effects import EffectOptions
+
+    frame = (request.headers.get("X-Frame", "") or "").strip().lower()
+    if frame not in _ALLOWED_FRAMES:
+        frame = ""
+
+    date_text = request.headers.get("X-Date-Text")
+    if date_text is not None:
+        date_text = date_text.strip()[:24] or None
+
+    try:
+        seed = int((request.headers.get("X-Seed", "0") or "0").strip())
+    except ValueError:
+        seed = 0
+
+    opts = EffectOptions(
+        date_stamp=_header_bool(request, "X-Date-Stamp"),
+        date_text=date_text,
+        frame=frame or None,
+        light_leak=_header_float(request, "X-Light-Leak", 0.0, 0.0, 1.0),
+        dust=_header_float(request, "X-Dust", 0.0, 0.0, 1.0),
+        seed=seed,
+    )
+    return opts if opts.any_enabled() else None
+
+
 @app.get("/health", response_model=HealthResponse, tags=["health"])
 def health_check() -> HealthResponse:
     return HealthResponse(
@@ -432,12 +487,16 @@ async def grade_photo(
             pass  # fall through to deterministic camera emulation
 
     requested = None if camera in ("", "auto", "ai") else camera
+    fx = _effect_options(request)
+    strength = _header_float(request, "X-Character", 1.0, 0.0, 1.5)
 
     # Explicit camera with a built profile -> reference-matched (real-sample) look.
     if requested:
         try:
             from camera_match import grade_with_reference
-            ref = grade_with_reference(payload, requested)
+            ref = grade_with_reference(
+                payload, requested, character_strength=strength, fx=fx
+            )
         except Exception:
             ref = None
         if ref:
@@ -453,7 +512,9 @@ async def grade_photo(
 
     # Deterministic parametric camera emulation (default / fallback when no profile).
     try:
-        graded_bytes, preset_id, preset_name = grade_image(payload, requested)
+        graded_bytes, preset_id, preset_name = grade_image(
+            payload, requested, character_strength=strength, fx=fx
+        )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Could not process image: {exc}")
 

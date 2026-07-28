@@ -280,7 +280,13 @@ def match_to_stat(
     return Image.fromarray(out)
 
 
-def grade_with_reference(image_bytes: bytes, camera: str, blend: float = 0.72):
+def grade_with_reference(
+    image_bytes: bytes,
+    camera: str,
+    blend: float = 0.72,
+    character_strength: float = 1.0,
+    fx=None,
+):
     """Apply the reference-matched camera look.
 
     Returns (jpeg_bytes, camera_id, scene, "reference") or None when there is no
@@ -312,9 +318,18 @@ def grade_with_reference(image_bytes: bytes, camera: str, blend: float = 0.72):
     try:
         from character import apply_character
 
-        matched = apply_character(matched, camera, scene)
+        if character_strength > 0:
+            matched = apply_character(matched, camera, scene, strength=character_strength)
     except Exception:
         pass  # character is an enhancement, never a hard dependency
+
+    if fx is not None:
+        try:
+            from effects import apply_effects
+
+            matched = apply_effects(matched, camera, fx)
+        except Exception:
+            pass
 
     output = BytesIO()
     matched.save(output, format="JPEG", quality=92)
