@@ -8,6 +8,8 @@ import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewSc
 import { checkHealth, fetchGallery, uploadFile, gradePhoto } from './src/services/api';
 import { DEFAULT_SETTINGS, gradeHeaders, loadSettings, saveSettings, type Settings } from './src/settings';
 import { addEntry, loadRoll, pruneMissing, removeEntry, saveRoll, updateEntry, type RollEntry } from './src/rollStore';
+import { developOnDevice, hasOnDeviceLook } from './src/look/renderStill';
+import { FILTERS } from './src/filters';
 import type { AppScreen, GalleryItem, SelectedFile } from './src/types';
 import type { FilterId } from './src/filters';
 
@@ -74,6 +76,45 @@ export default function App() {
     }
   }, []);
 
+  /**
+   * Develop a frame, preferring whichever path the situation calls for.
+   *
+   * On-device is instant and works offline but is an approximation; the backend applies
+   * the adaptive reference match and the full character layer. On-device is used when the
+   * user asks for it or when the backend isn't reachable, and it also serves as the
+   * fallback if a backend request fails.
+   */
+  const develop = useCallback(async (
+    uri: string,
+    camera: FilterId | 'auto',
+    shotSeed: number,
+  ): Promise<{ uri: string; id: string; name: string } | null> => {
+    const localFirst = settings.onDeviceLook || !backend;
+    const localCamera = camera === 'auto' ? 'g7x' : camera;   // no scene analysis offline
+
+    if (localFirst && hasOnDeviceLook(localCamera)) {
+      try {
+        const out = await developOnDevice({
+          uri, camera: localCamera, characterStrength: settings.characterStrength, seed: shotSeed,
+        });
+        if (out) {
+          const meta = FILTERS.find(f => f.id === localCamera);
+          return { uri: out, id: localCamera, name: meta ? `${meta.name} · on device` : localCamera };
+        }
+      } catch {
+        // Fall through to the backend, or to returning the untouched frame.
+      }
+    }
+
+    if (!backend) return null;
+    try {
+      const r = await gradePhoto(uri, camera, gradeHeaders(settings, shotSeed));
+      return { uri: r.gradedUri, id: r.presetId, name: r.presetName };
+    } catch {
+      return null;
+    }
+  }, [backend, settings]);
+
   // Photo captured -> apply the selected pocket-camera emulation, then save the
   // *graded* result to the camera roll (that's the photo the user actually wants).
   const onCapture = useCallback(async (f: SelectedFile, uri: string, camera: FilterId | 'auto') => {
@@ -85,59 +126,60 @@ export default function App() {
 
     if (settings.saveOriginal) void saveToLibrary(uri);
 
-    if (!backend) {
-      // No backend: the untouched capture is all we have, so keep it.
+    const canDevelop = backend || (settings.onDeviceLook || !backend);
+    if (!canDevelop) {
       setGrade({ kind: 'none' });
       setSaved(settings.autoSave ? await saveToLibrary(uri) : false);
       return;
     }
 
     setGrade({ kind: 'grading' });
-    try {
-      const { gradedUri, presetId, presetName } = await gradePhoto(uri, camera, gradeHeaders(settings, shotSeed));
-      setCaptured(gradedUri);
-      setLastThumb(gradedUri);
-      setFile({ ...f, uri: gradedUri });
-      setGrade({ kind: 'graded', name: presetName });
-      setSaved(settings.autoSave ? await saveToLibrary(gradedUri) : false);
-      commitRoll(addEntry(roll, {
-        uri: gradedUri,
-        originalUri: uri,
-        cameraId: presetId,
-        cameraName: presetName,
-        takenAt: Date.now(),
-        seed: shotSeed,
-      }));
-    } catch {
-      // Grading failed — keep the original and say so rather than pretending.
-      setGrade({ kind: 'failed' });
+    const result = await develop(uri, camera, shotSeed);
+    if (!result) {
+      // Nothing worked — keep the original and say so rather than pretending.
+      setGrade(backend || settings.onDeviceLook ? { kind: 'failed' } : { kind: 'none' });
       setSaved(settings.autoSave ? await saveToLibrary(uri) : false);
+      return;
     }
-  }, [backend, saveToLibrary, settings, roll, commitRoll]);
+
+    setCaptured(result.uri);
+    setLastThumb(result.uri);
+    setFile({ ...f, uri: result.uri });
+    setGrade({ kind: 'graded', name: result.name });
+    setSaved(settings.autoSave ? await saveToLibrary(result.uri) : false);
+    commitRoll(addEntry(roll, {
+      uri: result.uri,
+      originalUri: uri,
+      cameraId: result.id,
+      cameraName: result.name,
+      takenAt: Date.now(),
+      seed: shotSeed,
+    }));
+  }, [backend, saveToLibrary, settings, roll, commitRoll, develop]);
 
   /** Re-grade the original frame with another camera, from the preview screen. */
   const onRegrade = useCallback(async (camera: FilterId | 'auto') => {
     if (!original) return;
     const previous = captured;
     setGrade({ kind: 'grading' }); setSaved(false);
-    try {
-      const { gradedUri, presetId, presetName } = await gradePhoto(original, camera, gradeHeaders(settings, seed));
-      setCaptured(gradedUri);
-      setLastThumb(gradedUri);
-      setFile(prev => (prev ? { ...prev, uri: gradedUri } : prev));
-      setGrade({ kind: 'graded', name: presetName });
-      buzz(Haptics.ImpactFeedbackStyle.Light);
-      // Replace the roll entry in place so re-developing doesn't create duplicates.
-      commitRoll(previous
-        ? updateEntry(roll, previous, { uri: gradedUri, cameraId: presetId, cameraName: presetName })
-        : addEntry(roll, {
-            uri: gradedUri, originalUri: original, cameraId: presetId,
-            cameraName: presetName, takenAt: Date.now(), seed,
-          }));
-    } catch {
+    const result = await develop(original, camera, seed);
+    if (!result) {
       setGrade({ kind: 'failed' });
+      return;
     }
-  }, [original, captured, settings, seed, buzz, roll, commitRoll]);
+    setCaptured(result.uri);
+    setLastThumb(result.uri);
+    setFile(prev => (prev ? { ...prev, uri: result.uri } : prev));
+    setGrade({ kind: 'graded', name: result.name });
+    buzz(Haptics.ImpactFeedbackStyle.Light);
+    // Replace the roll entry in place so re-developing doesn't create duplicates.
+    commitRoll(previous
+      ? updateEntry(roll, previous, { uri: result.uri, cameraId: result.id, cameraName: result.name })
+      : addEntry(roll, {
+          uri: result.uri, originalUri: original, cameraId: result.id,
+          cameraName: result.name, takenAt: Date.now(), seed,
+        }));
+  }, [original, captured, seed, buzz, roll, commitRoll, develop]);
 
   /** Open a shot from the film roll, ready to re-develop. */
   const onOpenRollEntry = useCallback((entry: RollEntry) => {

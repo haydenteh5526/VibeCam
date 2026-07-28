@@ -122,6 +122,21 @@ export function SettingsScreen({ settings, onChange, onClose }: Props) {
           <Segmented options={LEVELS} value={settings.dust} onSelect={v => set({ dust: v })} />
         </View>
 
+        <Text style={s.section}>Developing</Text>
+        <View style={s.card}>
+          <View style={s.row}>
+            <View style={s.rowText}>
+              <Text style={s.label}>Develop on device</Text>
+              <Text style={s.hint}>
+                Instant and works offline. The look is a close approximation — the server
+                adds an adaptive colour match plus halation and lens softness.
+              </Text>
+            </View>
+            <Switch value={settings.onDeviceLook} onValueChange={v => set({ onDeviceLook: v })}
+              trackColor={{ true: '#FFD60A', false: '#3a3a3c' }} thumbColor="#fff" />
+          </View>
+        </View>
+
         <Text style={s.section}>Saving</Text>
         <View style={s.card}>
           <View style={s.row}>
