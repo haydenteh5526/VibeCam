@@ -47,13 +47,22 @@
     "plugins": [
       "expo-video",
       [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Allow VibeCam to access the camera to take photos.",
+          "enableMicrophonePermission": false,
+          "enableCodeScanner": false
+        }
+      ],
+      [
         "expo-media-library",
         {
           "photosPermission": "Allow VibeCam to save and access photos you capture in the app.",
           "savePhotosPermission": "Allow VibeCam to save your graded photos to your photo library.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-asset"
     ]
   }
 }

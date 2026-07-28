@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import { useCameraPermissions } from 'expo-camera';
+import { useCameraPermission } from 'react-native-vision-camera';
 
-import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewScreen, CameraScreen, SettingsScreen, RollScreen } from './src/screens';
+import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewScreen, ManualCameraScreen, SettingsScreen, RollScreen } from './src/screens';
 import { checkHealth, fetchGallery, uploadFile, gradePhoto } from './src/services/api';
 import { DEFAULT_SETTINGS, gradeHeaders, loadSettings, saveSettings, type Settings } from './src/settings';
 import { addEntry, loadRoll, pruneMissing, removeEntry, saveRoll, updateEntry, type RollEntry } from './src/rollStore';
@@ -21,7 +21,7 @@ export type GradeState =
   | { kind: 'failed' };                               // attempted, but the photo is ungraded
 
 export default function App() {
-  const [camPerm, requestCam] = useCameraPermissions();
+  const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
   const [screen, setScreen] = useState<AppScreen>('camera');
   const [backend, setBackend] = useState(false);
   // `captured` is what's on screen; `original` is the ungraded frame kept so the
@@ -240,7 +240,7 @@ export default function App() {
     setGrade({ kind: 'none' }); setSaved(false); setScreen('camera');
   }, []);
 
-  if (!camPerm?.granted) return <PermissionScreen onAllow={requestCam} />;
+  if (!hasCameraPermission) return <PermissionScreen onAllow={requestCameraPermission} />;
   if (screen === 'settings') {
     return <SettingsScreen settings={settings} onChange={updateSettings} onClose={() => setScreen('camera')} />;
   }
@@ -269,7 +269,7 @@ export default function App() {
     );
   }
   return (
-    <CameraScreen
+    <ManualCameraScreen
       onCapture={onCapture}
       onGallery={() => setScreen('roll')}
       onSettings={() => setScreen('settings')}
