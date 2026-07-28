@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, Image, PanResponder, Pressable, ScrollView
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { VideoPreview } from '../components/VideoPreview';
+import { DevelopingOverlay } from '../components/DevelopingOverlay';
 import { gradeWithVibe } from '../services/api';
 import { FILTERS, type FilterId } from '../filters';
 import type { SelectedFile } from '../types';
@@ -89,6 +90,9 @@ export function PreviewScreen({
           <Image source={{ uri: displayUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
         ) : null}
       </View>
+
+      {/* Darkroom overlay while the shot is being rendered */}
+      {busy && <DevelopingOverlay label={vibeLoading ? 'Grading' : 'Developing'} />}
 
       {/* Top bar */}
       <View style={s.top}>
