@@ -193,8 +193,46 @@ def _mkl_transfer_matrix(cov_src: np.ndarray, cov_ref: np.ndarray) -> np.ndarray
     return cs_inv_half @ middle @ cs_inv_half
 
 
-def match_to_stat(img: Image.Image, stat: dict, blend: float = 0.9) -> Image.Image:
-    """Map an image's colors toward a reference (mean, cov) via MKL, then blend."""
+def mix_stats(a: dict, b: dict, weight: float = 0.65) -> dict:
+    """Blend two (mean, cov) stats. `weight` is how much of `a` to keep.
+
+    Scene buckets are built from few samples, so leaning entirely on one bucket makes a
+    misclassified scene (a dusk cityscape read as 'indoor', say) impose a colour cast
+    that looks nothing like the camera. Mixing toward the camera's `overall` statistics
+    keeps the scene-specific character while bounding how wrong it can go.
+    """
+    if not a:
+        return b
+    if not b:
+        return a
+    w = float(np.clip(weight, 0.0, 1.0))
+    mean = w * np.asarray(a["mean"], dtype=np.float64) + (1 - w) * np.asarray(b["mean"], dtype=np.float64)
+    cov = w * np.asarray(a["cov"], dtype=np.float64) + (1 - w) * np.asarray(b["cov"], dtype=np.float64)
+    return {"mean": mean.tolist(), "cov": cov.tolist(), "files": a.get("files", 0)}
+
+
+# How far the reference mean may pull each channel (0-255 units). Without a cap, a
+# sparse or mismatched profile can drag an entire frame green or magenta.
+_MAX_MEAN_SHIFT = 26.0
+
+# Bounds on per-channel contrast gain. Keeps a poorly matched reference from crushing
+# or exploding a channel, which is how colour casts creep in.
+_MIN_CHANNEL_GAIN = 0.82
+_MAX_CHANNEL_GAIN = 1.22
+
+
+def match_to_stat(
+    img: Image.Image,
+    stat: dict,
+    blend: float = 0.72,
+    preserve_luma: float = 0.6,
+) -> Image.Image:
+    """Map an image's colors toward a reference (mean, cov) via MKL, then blend.
+
+    `preserve_luma` keeps that fraction of the original per-pixel luminance. We want to
+    borrow the camera's *colour rendering*, not overwrite the scene's own exposure and
+    tonality — tone is handled deliberately by the character layer instead.
+    """
     rgb = img.convert("RGB")
     arr = np.asarray(rgb, dtype=np.float64)
     h, w, _ = arr.shape
@@ -208,19 +246,41 @@ def match_to_stat(img: Image.Image, stat: dict, blend: float = 0.9) -> Image.Ima
     mu_ref = np.asarray(stat["mean"], dtype=np.float64)
     cov_ref = np.asarray(stat["cov"], dtype=np.float64) + _EPS * np.eye(3)
 
-    # If the source is nearly flat, covariance transport is unstable — mean-shift.
-    if np.linalg.det(cov_src) < 1e-6:
-        matched = flat - mu_src + mu_ref
-    else:
-        transfer = _mkl_transfer_matrix(cov_src, cov_ref)
-        matched = (flat - mu_src) @ transfer.T + mu_ref
+    # Bound how far the reference can drag the overall colour balance.
+    shift = np.clip(mu_ref - mu_src, -_MAX_MEAN_SHIFT, _MAX_MEAN_SHIFT)
+    mu_ref = mu_src + shift
+
+    # Per-channel (diagonal) matching rather than full-covariance MKL.
+    #
+    # Textbook MKL transports the whole covariance, which also *rotates* hue. That is
+    # only sound when reference and source depict comparable content. Our profiles are
+    # built from whatever the sample galleries happened to photograph, so their
+    # covariance encodes scene content (foliage, cityscapes) as much as the camera's
+    # colour science — and transporting it produced violent green/magenta casts on
+    # smooth gradients. Matching each channel's mean and spread independently cannot
+    # rotate hue, degrades gracefully when the reference is a poor match, and still
+    # carries the camera's white balance and per-channel contrast.
+    std_src = np.sqrt(np.clip(np.diag(cov_src), 1e-6, None))
+    std_ref = np.sqrt(np.clip(np.diag(cov_ref), 1e-6, None))
+    gain = np.clip(std_ref / std_src, _MIN_CHANNEL_GAIN, _MAX_CHANNEL_GAIN)
+    matched = (flat - mu_src) * gain + mu_ref
 
     out = flat * (1.0 - blend) + matched * blend
+
+    # Put the original luminance back, so the transfer changes colour far more than tone.
+    pl = float(np.clip(preserve_luma, 0.0, 1.0))
+    if pl > 0:
+        lw = np.array([0.2126, 0.7152, 0.0722], dtype=np.float64)
+        src_l = flat @ lw
+        out_l = out @ lw
+        delta = (src_l - out_l) * pl
+        out = out + delta[:, None]
+
     out = np.clip(out, 0, 255).reshape(h, w, 3).astype(np.uint8)
     return Image.fromarray(out)
 
 
-def grade_with_reference(image_bytes: bytes, camera: str, blend: float = 0.9):
+def grade_with_reference(image_bytes: bytes, camera: str, blend: float = 0.72):
     """Apply the reference-matched camera look.
 
     Returns (jpeg_bytes, camera_id, scene, "reference") or None when there is no
@@ -238,7 +298,24 @@ def grade_with_reference(image_bytes: bytes, camera: str, blend: float = 0.9):
     if not stat:
         return None
 
+    # Temper the scene bucket with the camera's overall statistics: scene buckets are
+    # built from few samples, so a misclassified scene shouldn't dictate the whole look.
+    overall = profile["scenes"].get("overall")
+    if overall and stat is not overall:
+        stat = mix_stats(stat, overall, weight=0.65)
+
     matched = match_to_stat(img, stat, blend=blend)
+
+    # Colour match alone reads as a filter. Layer the camera's optical/sensor
+    # character (highlight bloom, falloff, noise, fringing, JPEG sharpening) so the
+    # result feels like it came off that camera rather than through a preset.
+    try:
+        from character import apply_character
+
+        matched = apply_character(matched, camera, scene)
+    except Exception:
+        pass  # character is an enhancement, never a hard dependency
+
     output = BytesIO()
     matched.save(output, format="JPEG", quality=92)
     return output.getvalue(), camera, scene, "reference"

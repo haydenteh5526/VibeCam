@@ -114,9 +114,16 @@ def test_match_moves_toward_reference(warm_profile):
     assert cam_id == "g7x" and method == "reference"
 
     out_mean = np.asarray(Image.open(BytesIO(jpeg)).convert("RGB"), dtype=np.float64).reshape(-1, 3).mean(axis=0)
-    # Red should rise, blue should fall relative to the neutral input.
-    assert out_mean[0] > src[0] + 15
-    assert out_mean[2] < src[2] - 10
+    # Red should rise and blue should fall, moving toward the reference's warm cast.
+    #
+    # Thresholds are deliberately modest: the transfer is per-channel, blended (~0.72),
+    # mean-shift capped and luminance-preserving, because full-strength covariance
+    # transport produced colour casts on real photos. We assert the *direction* of the
+    # match plus a meaningful magnitude, not a maximal one.
+    assert out_mean[0] > src[0] + 8
+    assert out_mean[2] < src[2] - 5
+    # And the warm shift must be ordered: red pulled up more than blue.
+    assert (out_mean[0] - src[0]) > (out_mean[2] - src[2])
 
 
 def test_grade_with_reference_returns_none_without_profile(tmp_path, monkeypatch):
