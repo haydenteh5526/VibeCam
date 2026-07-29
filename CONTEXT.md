@@ -38,26 +38,53 @@ There is also a shorter engineering log at `docs/PROJECT_CONTEXT.md`.
 ```
 vibe-cam/
 ├── mobile/
-│   ├── App.tsx                     # screen orchestration; onCapture -> gradePhoto(camera)
+│   ├── App.tsx                     # screen orchestration, develop() path, roll + settings state
+│   ├── assets/luts/<cam>.png       # baked 3D LUT strips (289x17) shipped in the bundle
 │   └── src/
 │       ├── filters.ts              # FilterId + FILTERS = camera emulations (ids match backend)
-│       ├── autoFilter.ts           # pickBestFilter() scene-based camera pick (live preview)
-│       ├── services/api.ts         # gradePhoto(uri, camera) -> POST /grade w/ X-Camera header
+│       ├── settingsCore.ts         # pure settings types + validation (unit-tested)
+│       ├── settings.ts             # settings persistence (platform-aware)
+│       ├── roll.ts                 # pure film-roll logic (unit-tested)
+│       ├── rollStore.ts            # roll persistence + pruneMissing
+│       ├── look/                   # ON-DEVICE LOOK ENGINE
+│       │   ├── lut.ts              # pure TS LUT sampling (parity-tested vs Python)
+│       │   ├── shader.ts           # GLSL: LUT + rolloff + vignette + grain
+│       │   ├── characterParams.ts  # per-camera uniforms mirroring backend character.py
+│       │   └── renderStill.ts      # expo-gl offscreen render -> developed JPEG
+│       ├── services/
+│       │   ├── api.ts              # gradePhoto/gradeWithVibe/uploads (+ X-Camera, effect headers)
+│       │   └── storage.ts          # platform-aware bytes + JSON (native fs vs web blob/localStorage)
+│       ├── components/
+│       │   ├── CameraPicker.tsx    # stylised camera-body picker
+│       │   ├── DevelopingOverlay.tsx  # darkroom "developing" animation
+│       │   └── DeviceFrame.tsx     # iPhone-shaped frame for web + useLayoutWidth()
+│       ├── __tests__/              # tsx + node:test (npm test)
 │       └── screens/
-│           ├── CameraScreen.tsx     # camera UI + camera strip; sends selected camera
-│           └── PreviewScreen.tsx    # shows applied camera badge
+│           ├── CameraScreen.tsx     # capture UI (expo-camera)
+│           ├── ManualCameraScreen.tsx  # VisionCamera version — ONLY on PR #21 branch
+│           ├── PreviewScreen.tsx    # applied look, re-develop strip, hold-to-compare
+│           ├── SettingsScreen.tsx   # all settings
+│           └── RollScreen.tsx       # in-app film roll
 ├── backend/
-│   ├── main.py                     # FastAPI app + /grade, /cameras, /grade/vibe, /guide, uploads
+│   ├── main.py                     # FastAPI + /grade, /cameras, /grade/vibe, /guide, uploads, auth
 │   ├── grading.py                  # parametric presets (film + CAMERAS) + pipeline + auto-pick
-│   ├── camera_match.py             # reference matching (profiles + MKL transfer)  ← accurate mode
+│   ├── camera_match.py             # reference matching (per-channel transfer)  ← accurate mode
+│   ├── character.py                # optical/sensor character (bloom, CA, noise, vignette…)
+│   ├── effects.py                  # date stamp, frames, light leak, dust
+│   ├── lut.py                      # bake looks to .cube / PNG strips
 │   ├── camera_samples/<cam>/<scene>/   # SOOC reference JPEGs (git-ignored)
-│   ├── camera_profiles/<cam>.json  # derived stats built from samples (committable)
+│   ├── camera_profiles/<cam>.json  # derived stats built from samples (committed)
+│   ├── luts/                       # baked .cube files (git-ignored, regenerable)
 │   ├── tools/
 │   │   ├── check_samples.py        # EXIF-verify samples
-│   │   └── build_profile.py        # build a camera profile from samples
+│   │   ├── build_profile.py        # build a camera profile from samples
+│   │   ├── build_luts.py           # bake LUTs (run after changing camera colours)
+│   │   └── gen_lut_fixture.py      # regenerate the TS/Python LUT parity fixture
 │   ├── ai/                         # optional AI providers (gemini / g4f / openai)
-│   └── tests/                      # pytest (test_api_smoke, test_grading, test_camera_match)
-└── docs/PROJECT_CONTEXT.md         # engineering log
+│   └── tests/                      # pytest: api_smoke, grading, camera_match, character, effects, lut, auth
+└── docs/
+    ├── DEPLOY.md                   # deploy + web/Expo Go/EAS run instructions
+    └── PROJECT_CONTEXT.md          # engineering log
 ```
 
 ---
@@ -217,10 +244,17 @@ reproduce a 1-inch sensor's depth of field or low-light character (see §8).
 - **Backend venv**: `C:\venv\vibe-cam` (Python 3.14 locally; has fastapi, numpy,
   opencv-python-headless, pillow, pytest). CI uses Python 3.11.
 - **Run backend**: `cd backend && uvicorn main:app --host 127.0.0.1 --port 8000 --reload` → health at `GET /127.0.0.1:8000/health`.
-- **Backend tests**: `cd backend && python -m pytest -q` → **38 passed**.
+- **Backend tests**: `cd backend && python -m pytest -q` → **117 passed**.
   ⚠️ Run from `backend/` (running from repo root also collects `references/**` test files, which error on missing deps).
+- **Mobile tests**: `cd mobile && npm test` → **46 passed** (tsx + node:test).
 - **Mobile typecheck**: `cd mobile && npx tsc --noEmit` → clean.
-- **Mobile run**: `cd mobile && npm run ios` (or `android`).
+- **Run on the laptop (fastest loop)**: `cd mobile && npm run web` → iPhone-shaped frame in
+  the browser. Add `-c` (`npx expo start --web -c`) if Metro serves a stale file.
+  Photo-library saving, haptics and sharing don't exist on web; the GL path is unverified there.
+- **Run on the phone**: `cd mobile && npm run go:tunnel` (Expo Go; works with the phone on
+  mobile data). `npm run go` if both devices share Wi-Fi.
+- **Web bundle check**: `npx expo export --platform web` — catches runtime/bundling
+  breakage a typecheck won't.
 - **Env vars**: mobile `EXPO_PUBLIC_API_BASE_URL`, `EXPO_PUBLIC_API_KEY`; backend
   `VIBECAM_MAX_UPLOAD_BYTES`, `VIBECAM_UPLOAD_TTL_MINUTES`, `VIBECAM_API_KEY`;
   AI optional (`AI_PROVIDER`, `GOOGLE_AI_API_KEY`) — not needed for camera/reference modes.
@@ -252,6 +286,9 @@ optional API-key gate; docs.
   `mobile/assets/luts/*.png`) applied in an expo-gl shader with rolloff, vignette and
   grain. Capture is instant and works offline.
 - **Mobile test harness** — `tsx` + `node:test`, run in CI.
+- **Web development surface** — the app runs in a browser inside an iPhone-shaped frame
+  (`components/DeviceFrame`), with a platform-aware storage adapter because
+  expo-file-system is native-only. Fast loop for UI work; not for judging looks.
 
 **Test counts**: backend **117**, mobile **46**. Both run in CI alongside the typecheck.
 
@@ -307,9 +344,59 @@ buckets are thin — portraits mostly fall back to `overall`, which is daylight-
 
 ---
 
-## 12. Gotchas
+## 12. Handoff — picking this up on another machine
 
-- **Windows/PowerShell**: avoid `>` for generated text files (UTF-16); prefer UTF-8. Shell stdout capture can be flaky — redirect to a file and read it.
+Written because the work so far happened on a work laptop that won't be available.
+
+**Nothing is machine-locked.** Everything needed is in the repo or reproducible:
+
+| Thing | Where it lives | Notes |
+|---|---|---|
+| Code, docs, tests | GitHub `haydenteh5526/VibeCam`, branch `main` | Only `main` plus the PR #21 branch |
+| Camera profiles | `backend/camera_profiles/*.json` (committed) | Derived stats, ~2.8 KB each |
+| LUT assets | `mobile/assets/luts/*.png` (committed) | Regenerable via `tools/build_luts.py` |
+| Reference sample photos | **local only, git-ignored** | Third-party; re-downloadable from DPReview galleries. Not needed unless rebuilding profiles |
+| Backend deploy | Render blueprint in `render.yaml` | Tied to the Render account, not the laptop |
+| Secrets | `VIBECAM_API_KEY` in the Render dashboard | `sync: false`, never in the repo |
+
+**To set up elsewhere:**
+```bash
+git clone https://github.com/haydenteh5526/VibeCam && cd VibeCam
+cd backend && python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt && python -m pytest -q
+cd ../mobile && npm install && npm test && npm run web
+```
+Copy `mobile/.env.example` → `.env` and set `EXPO_PUBLIC_API_BASE_URL` (the Render URL, or a
+LAN IP for a local backend).
+
+**The one thing that would be lost**: the local `backend/camera_samples/` images. Only
+needed to re-run `tools/build_profile.py`; the committed profiles already encode them.
+
+**Where to pick up** — see §11. In short: verify on a real iPhone, then merge PR #21
+(ends Expo Go support), then Phase 3b live preview. The highest-risk unverified code is
+`mobile/src/look/` (hand-written GLSL, never compiled on a device).
+
+---
+
+## 13. Gotchas
+
+- **Windows/PowerShell**: avoid `>` for generated text files (UTF-16); prefer UTF-8. Shell stdout capture can be flaky — redirect to a file and read it. Avoid backticks in `gh pr create --body`; use `--body-file`.
 - **pytest**: must be run from `backend/`.
+- **Stale Metro cache**: if the dev server is running while source files change underneath
+  it, Metro can serve a cached half-written file and report a `SyntaxError` on a line that
+  is actually fine. Verify with
+  `node -e "require('@babel/parser').parse(require('fs').readFileSync('App.tsx','utf8'),{sourceType:'module',plugins:['typescript','jsx']})"`
+  and restart with `-c` (`npx expo start --web -c`) rather than hunting a phantom bug.
 - **Samples vs profiles**: never commit third-party sample images (git-ignored); only commit the derived `camera_profiles/*.json`.
 - **Ids must stay in sync** between `mobile/src/filters.ts` and `backend/grading.py` `CAMERAS` (they are sent as the `X-Camera` header).
+- **LUT assets go stale**: after changing any camera's colour parameters, run
+  `cd backend && python tools/build_luts.py`. A test fails if the committed PNGs don't
+  match a fresh bake.
+- **Never size layout from `Dimensions.get('window')`** — on web that's the browser
+  window, not the phone frame. Use `useLayoutWidth()` from `components/DeviceFrame`.
+- **expo-file-system does not work on web** (it warns and returns nothing). All binary
+  and JSON persistence must go through `services/storage.ts`.
+- **Render free tier sleeps**: the first request after idle takes ~30 s. The health check
+  retries with backoff; don't mistake a cold start for an outage.
+- **`npx expo install` can pick an incompatible major** (it chose VisionCamera 5.x, which
+  needs nitro-modules and RN 0.85, against this project's RN 0.81). Check peer deps.
+
