@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LightSensor } from 'expo-sensors';
 import { CameraView, CameraType, FlashMode } from 'expo-camera';
@@ -7,12 +7,12 @@ import { File } from 'expo-file-system';
 import { StatusBar } from 'expo-status-bar';
 import { FILTERS, type FilterId } from '../filters';
 import { CameraPicker } from '../components/CameraPicker';
+import { useLayoutWidth } from '../components/DeviceFrame';
 import { getRandomPose, type PoseSuggestion } from '../poses';
 import { guideComposition } from '../services/api';
 import type { Settings } from '../settings';
 import type { SelectedFile } from '../types';
 
-const { width: W } = Dimensions.get('window');
 type FlashState = 'auto' | 'on' | 'off';
 
 // iOS reports physical lenses by AVFoundation device type. Mapping them to the
@@ -53,6 +53,11 @@ type Props = {
 };
 
 export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, backendReady, settings }: Props) {
+  // Sized against the phone frame, not the browser window, so the 4:3 viewfinder maths
+  // stay correct when the app runs on web for development.
+  const W = useLayoutWidth();
+  const vfSize = { width: W - 16, height: (W - 16) * (4 / 3) };
+  const ovalSize = { width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19 };
   const [facing, setFacing] = useState<CameraType>('back');
   const [flashState, setFlashState] = useState<FlashState>('auto');
   const [ready, setReady] = useState(false);
@@ -246,7 +251,7 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
           A flex-filled box letterboxes or crops the sensor's 4:3 output, which is why
           the framing looked wrong compared to the stock Camera app. */}
       <View style={st.vfOuter}>
-        <View style={st.vfWrap}>
+        <View style={[st.vfWrap, vfSize]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={resetZoom}
             onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })} onTouchEnd={onPinchEnd}>
             <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} flash={flashMode} zoom={zoom}
@@ -257,7 +262,7 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
               onCameraReady={onCameraReady} onMountError={e => setErr(e.message)} />
             {previewFilter?.style.overlayColor && <View style={[st.overlay, { backgroundColor: previewFilter.style.overlayColor, opacity: previewFilter.style.overlayOpacity ?? 0.1 }]} pointerEvents="none" />}
             {showGrid && <View style={st.grid} pointerEvents="none"><View style={[st.gl, { left: '33.3%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { left: '66.6%', top: 0, bottom: 0, width: 1 }]} /><View style={[st.gl, { top: '33.3%', left: 0, right: 0, height: 1 }]} /><View style={[st.gl, { top: '66.6%', left: 0, right: 0, height: 1 }]} /></View>}
-            {showGuide && <View style={st.guideOval} pointerEvents="none" />}
+            {showGuide && <View style={[st.guideOval, ovalSize]} pointerEvents="none" />}
             {lowLight && <View style={st.hintBadge} pointerEvents="none"><Text style={st.hintT}>Low light — hold steady</Text></View>}
             {zoom > 0 && <View style={st.zoomBadge} pointerEvents="none"><Text style={st.zoomT}>{`ZOOM +${Math.round(zoom * 100)}%  ·  tap to reset`}</Text></View>}
             {countdown !== null && <View style={st.countBg}><Text style={st.countN}>{countdown}</Text></View>}
@@ -368,10 +373,10 @@ const st = StyleSheet.create({
 
   // Viewfinder — fixed 4:3 (portrait 3:4) so preview == captured frame
   vfOuter: { flex: 1, justifyContent: 'center' },
-  vfWrap: { width: W - 16, height: (W - 16) * (4 / 3), alignSelf: 'center', borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a' },
+  vfWrap: { alignSelf: 'center', borderRadius: 20, overflow: 'hidden', backgroundColor: '#1a1a1a' },
   overlay: { ...StyleSheet.absoluteFillObject },
   grid: { ...StyleSheet.absoluteFillObject }, gl: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.2)' },
-  guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' },
+  guideOval: { position: 'absolute', top: '12%', alignSelf: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderStyle: 'dashed' },
   lensRow: { flexDirection: 'row', alignSelf: 'center', marginTop: 10, backgroundColor: 'rgba(28,28,30,0.8)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', padding: 3, gap: 2 },
   lensPill: { minWidth: 36, height: 36, paddingHorizontal: 8, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   lensPillOn: { backgroundColor: 'rgba(60,60,62,0.95)' },
@@ -421,3 +426,4 @@ const st = StyleSheet.create({
   toast: { position: 'absolute', top: 110, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 10, padding: 10 },
   toastT: { color: '#fff', fontSize: 12, textAlign: 'center' },
 });
+
