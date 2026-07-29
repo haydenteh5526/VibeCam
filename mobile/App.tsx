@@ -9,6 +9,7 @@ import { checkHealth, fetchGallery, uploadFile, gradePhoto } from './src/service
 import { DEFAULT_SETTINGS, gradeHeaders, loadSettings, saveSettings, type Settings } from './src/settings';
 import { addEntry, loadRoll, pruneMissing, removeEntry, saveRoll, updateEntry, type RollEntry } from './src/rollStore';
 import { developOnDevice, hasOnDeviceLook } from './src/look/renderStill';
+import { DeviceFrame } from './src/components/DeviceFrame';
 import { FILTERS } from './src/filters';
 import type { AppScreen, GalleryItem, SelectedFile } from './src/types';
 import type { FilterId } from './src/filters';
@@ -40,7 +41,23 @@ export default function App() {
   // One seed per captured frame, so re-developing reproduces the same leak/dust/grain.
   const [seed, setSeed] = useState(0);
 
-  useEffect(() => { checkHealth().then(setBackend); }, []);
+  // Poll health until the backend answers. The free Render instance sleeps, so the first
+  // check can take ~30s — a single attempt would leave the UI stuck on "offline".
+  useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+    const tick = async () => {
+      if (cancelled) return;
+      const ok = await checkHealth();
+      if (cancelled) return;
+      setBackend(ok);
+      attempts += 1;
+      // Keep retrying for a few minutes, backing off, then stop pestering it.
+      if (!ok && attempts < 8) setTimeout(tick, Math.min(30_000, 3_000 * attempts));
+    };
+    void tick();
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => { loadSettings().then(setSettings); }, []);
   // Prune shots whose cached image iOS has since purged, so the roll has no dead tiles.
   useEffect(() => { loadRoll().then(pruneMissing).then(setRoll); }, []);
@@ -240,6 +257,8 @@ export default function App() {
     setGrade({ kind: 'none' }); setSaved(false); setScreen('camera');
   }, []);
 
+  // Extracted so the whole app can be wrapped in the web device frame in one place.
+  const renderScreen = () => {
   if (!camPerm?.granted) return <PermissionScreen onAllow={requestCam} />;
   if (screen === 'settings') {
     return <SettingsScreen settings={settings} onChange={updateSettings} onClose={() => setScreen('camera')} />;
@@ -278,4 +297,10 @@ export default function App() {
       settings={settings}
     />
   );
+  };
+
+  // On a device this renders children directly; in a browser it constrains the app to an
+  // iPhone-sized frame so laptop development matches what the phone will show.
+  return <DeviceFrame>{renderScreen()}</DeviceFrame>;
 }
+

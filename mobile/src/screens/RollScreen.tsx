@@ -1,12 +1,11 @@
 import React from 'react';
-import { Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useLayoutWidth } from '../components/DeviceFrame';
 import { groupByDay, type RollEntry } from '../roll';
 
 const COLS = 3;
 const GAP = 3;
-const W = Dimensions.get('window').width;
-const TILE = (W - GAP * (COLS + 1)) / COLS;
 
 type Props = {
   roll: RollEntry[];
@@ -31,6 +30,9 @@ function dayLabel(day: string): string {
 /** The app's own roll of developed shots — separate from the device photo library. */
 export function RollScreen({ roll, onOpen, onBack }: Props) {
   const groups = groupByDay(roll);
+  // Tiles size against the phone frame so the grid matches the device on web.
+  const W = useLayoutWidth();
+  const tileSize = { width: (W - GAP * (COLS + 1)) / COLS, height: (W - GAP * (COLS + 1)) / COLS };
 
   return (
     <View style={s.bg}>
@@ -56,7 +58,7 @@ export function RollScreen({ roll, onOpen, onBack }: Props) {
               <Text style={s.day}>{dayLabel(group.day)}</Text>
               <View style={s.grid}>
                 {group.items.map(item => (
-                  <Pressable key={item.uri} onPress={() => onOpen(item)} style={s.tile}>
+                  <Pressable key={item.uri} onPress={() => onOpen(item)} style={[s.tile, tileSize]}>
                     <Image source={{ uri: item.uri }} style={s.thumb} />
                     <View style={s.tag}><Text style={s.tagT} numberOfLines={1}>{item.cameraName}</Text></View>
                   </Pressable>
@@ -82,7 +84,7 @@ const s = StyleSheet.create({
   group: { marginBottom: 18 },
   day: { color: '#8e8e93', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 6, marginBottom: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
-  tile: { width: TILE, height: TILE, borderRadius: 8, overflow: 'hidden', backgroundColor: '#1c1c1e' },
+  tile: { borderRadius: 8, overflow: 'hidden', backgroundColor: '#1c1c1e' },
   thumb: { width: '100%', height: '100%' },
   tag: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 5, paddingVertical: 3 },
   tagT: { color: '#fff', fontSize: 8, fontWeight: '600' },
@@ -92,3 +94,4 @@ const s = StyleSheet.create({
   emptyT: { color: '#8e8e93', fontSize: 14, fontWeight: '600', textAlign: 'center' },
   emptyH: { color: '#636366', fontSize: 11, textAlign: 'center', lineHeight: 16 },
 });
+
