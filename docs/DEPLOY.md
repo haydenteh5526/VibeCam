@@ -63,7 +63,31 @@ Every dependency is a first-party Expo module (no custom native code), so **Expo
 works** — which matters because `npx expo run:ios` needs macOS + Xcode and is not an
 option from Windows.
 
-### Fastest: Expo Go (no build, no Mac)
+### Fastest iteration: run it on the laptop (web)
+
+For UI and layout work, skip the phone entirely:
+
+```bash
+cd mobile
+npm run web        # serves on http://localhost:8081
+```
+
+Hot reload is instant and browser devtools work. What does and doesn't apply:
+
+| Works on web | Doesn't |
+|---|---|
+| Every screen, layout, navigation | Saving to the photo library (no such thing in a browser) |
+| Settings and film roll (localStorage) | Haptics and sharing (silently ignored) |
+| Viewfinder via the laptop webcam | On-device GL developing is unverified here — use the backend path |
+| Capture, backend grading, re-develop | |
+
+`expo-file-system` does not exist on web, so binary I/O and persistence route through
+`src/services/storage.ts`, which falls back to blob URLs and localStorage in a browser.
+
+Treat web as a **development surface only**: verify looks and camera behaviour on the
+phone, because a laptop webcam is nothing like an iPhone sensor.
+
+### On the phone: Expo Go (no build, no Mac)
 
 ```bash
 cd mobile

@@ -1,6 +1,7 @@
 import { Asset } from 'expo-asset';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { File, Paths } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 import { characterFor } from './characterParams';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader';
@@ -180,9 +181,12 @@ export async function developOnDevice(opts: DevelopOptions): Promise<string | nu
       flip: false,
     });
 
-    // Move the snapshot somewhere stable and predictable.
-    const out = new File(Paths.cache, `vibecam_dev_${Date.now()}_${opts.seed}.jpg`);
+    // Move the snapshot somewhere stable and predictable. On web there is no
+    // filesystem, so the snapshot URI (a blob/data URL) is already displayable.
     const snapUri = typeof snapshot.uri === 'string' ? snapshot.uri : String(snapshot.uri);
+    if (Platform.OS === 'web') return snapUri;
+
+    const out = new File(Paths.cache, `vibecam_dev_${Date.now()}_${opts.seed}.jpg`);
     const src = new File(snapUri);
     if (out.exists) out.delete();
     src.move(out);
