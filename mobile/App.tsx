@@ -43,7 +43,7 @@ export default function App() {
   useEffect(() => { checkHealth().then(setBackend); }, []);
   useEffect(() => { loadSettings().then(setSettings); }, []);
   // Prune shots whose cached image iOS has since purged, so the roll has no dead tiles.
-  useEffect(() => { loadRoll().then(r => setRoll(pruneMissing(r))); }, []);
+  useEffect(() => { loadRoll().then(pruneMissing).then(setRoll); }, []);
 
   /** Update the roll and persist it. */
   const commitRoll = useCallback((next: RollEntry[]) => {

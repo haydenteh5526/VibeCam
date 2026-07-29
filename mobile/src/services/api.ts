@@ -1,29 +1,14 @@
-import { File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { API_BASE_URL, CHUNK_SIZE, authHeaders } from '../constants';
+import { readBytes, saveImageResponse } from './storage';
 import { resolveFileSize } from '../utils';
 import type { SelectedFile, UploadInitResponse, UploadChunkResponse } from '../types';
 
-// React Native can't use web Blob / URL.createObjectURL for binary I/O:
-// <Image> cannot render `blob:` URIs on native, and createObjectURL is absent on
-// Hermes. So read the captured file's bytes with expo-file-system, and persist the
-// graded response to a real file:// URI that <Image> and Sharing can use.
+// Binary I/O differs by platform: expo-file-system is native-only, while React Native
+// can't render blob: URIs and a browser can't use file:. Both paths live in ./storage so
+// the rest of this module stays platform-agnostic.
 async function readFileBytes(uri: string): Promise<Uint8Array<ArrayBuffer>> {
-  return await new File(uri).bytes();
-}
-
-async function saveImageResponse(response: Response): Promise<string> {
-  const blob = await response.blob();
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
-    reader.readAsDataURL(blob);
-  });
-  const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl;
-  const out = new File(Paths.cache, `vibecam_${Date.now()}_${Math.floor(Math.random() * 1e6)}.jpg`);
-  out.create({ overwrite: true, intermediates: true });
-  out.write(base64, { encoding: 'base64' });
-  return out.uri;
+  return await readBytes(uri);
 }
 
 export async function gradePhoto(
