@@ -45,7 +45,7 @@ export function RollScreen({ roll, onOpen, onBack, onImport, onSettings, busy, e
         <View>
           <Text style={s.title}>Film Roll</Text>
           <Text style={s.count}>{roll.length === 0 ? 'No shots yet' : `${roll.length} item${roll.length === 1 ? '' : 's'}`}</Text>
-          <Text style={s.count}>Latest 60 photos and clips · Save favourites to Photos</Text>
+          <Text style={s.count}>Stored on this iPhone · Save a copy to Photos</Text>
         </View>
         <Pressable accessibilityRole="button" onPress={onBack} style={s.pill}><Text style={s.pillT}>Camera</Text></Pressable>
       </View>

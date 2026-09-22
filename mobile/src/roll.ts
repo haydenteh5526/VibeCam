@@ -3,7 +3,7 @@
  *
  * Pure logic, no native imports, so it can be unit-tested. The list is an index of
  * URIs plus metadata — media files live in app documents; Save makes a separate copy
- * in Photos. Capped so the index cannot grow without bound.
+ * in Photos. Never evict a shot merely because another one was taken.
  */
 
 export type RollEntry = {
@@ -26,13 +26,10 @@ export type RollEntry = {
   durationMs?: number;
 };
 
-/** Bound the app's local film roll; users save favourites to Photos. */
-export const MAX_ROLL = 60;
-
-export function addEntry(roll: RollEntry[], entry: RollEntry, max: number = MAX_ROLL): RollEntry[] {
+export function addEntry(roll: RollEntry[], entry: RollEntry): RollEntry[] {
   // Newest first, de-duplicated by uri so a re-develop replaces rather than appends.
   const withoutDupe = roll.filter(e => e.uri !== entry.uri);
-  return [entry, ...withoutDupe].slice(0, max);
+  return [entry, ...withoutDupe];
 }
 
 export function removeEntry(roll: RollEntry[], uri: string): RollEntry[] {
@@ -45,7 +42,7 @@ export function updateEntry(roll: RollEntry[], oldUri: string, patch: Partial<Ro
 }
 
 /** Validate a persisted roll, dropping anything malformed. */
-export function normalizeRoll(raw: unknown, max: number = MAX_ROLL): RollEntry[] {
+export function normalizeRoll(raw: unknown): RollEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: RollEntry[] = [];
   for (const item of raw) {
@@ -64,7 +61,7 @@ export function normalizeRoll(raw: unknown, max: number = MAX_ROLL): RollEntry[]
       ...(r.mediaType === 'video' ? { durationMs: typeof r.durationMs === 'number' && Number.isFinite(r.durationMs) && r.durationMs >= 0 ? r.durationMs : 0 } : {}),
     });
   }
-  return out.slice(0, max);
+  return out;
 }
 
 /** Group entries by calendar day for a sectioned roll view. */

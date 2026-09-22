@@ -17,7 +17,7 @@ VibeCam develops photos and video clips on your iPhone. This release does not up
 
 ## Storage and deletion
 
-Film Roll stores the latest 60 photos and clips, including their originals, in the app's storage. Clips are limited to 15 seconds. Adding a new item at the limit removes the oldest item from Film Roll. Save favourites to Photos to keep a separate copy.
+Film Roll stores photos and clips, including their originals, in the app's storage until you delete them or uninstall the app. Clips are limited to 15 seconds. Save a copy to Photos if you want it outside the app.
 
 Deleting an item from Film Roll removes its app-owned media, thumbnail and original. It does not delete copies already saved to Photos or shared elsewhere. Removing the app removes its local Film Roll; separate copies and device backups follow your device and backup settings.
 

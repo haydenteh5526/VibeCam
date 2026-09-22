@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { addEntry, groupByDay, MAX_ROLL, normalizeRoll, removeEntry, updateEntry, type RollEntry } from '../roll';
+import { addEntry, groupByDay, normalizeRoll, removeEntry, updateEntry, type RollEntry } from '../roll';
 
 function entry(uri: string, takenAt = 1_000, extra: Partial<RollEntry> = {}): RollEntry {
   return {
@@ -27,12 +27,12 @@ test('addEntry de-duplicates by uri so a re-develop replaces the entry', () => {
   assert.equal(again[0].cameraName, 'New');
 });
 
-test('addEntry caps the roll length', () => {
+test('addEntry never discards an older shot', () => {
   let roll: RollEntry[] = [];
-  for (let i = 0; i < MAX_ROLL + 25; i++) roll = addEntry(roll, entry(`u${i}`, i));
-  assert.equal(roll.length, MAX_ROLL);
-  // The newest survive, the oldest fall off.
-  assert.equal(roll[0].uri, `u${MAX_ROLL + 24}`);
+  for (let i = 0; i < 85; i++) roll = addEntry(roll, entry(`u${i}`, i));
+  assert.equal(roll.length, 85);
+  assert.equal(roll[0].uri, 'u84');
+  assert.equal(roll[84].uri, 'u0');
 });
 
 test('removeEntry drops only the matching uri', () => {
@@ -84,9 +84,9 @@ test('normalizeRoll repairs bad field types', () => {
   assert.equal(out[0].seed, 0);
 });
 
-test('normalizeRoll enforces the cap', () => {
-  const raw = Array.from({ length: MAX_ROLL + 10 }, (_, i) => entry(`u${i}`));
-  assert.equal(normalizeRoll(raw).length, MAX_ROLL);
+test('normalizeRoll preserves every valid stored shot', () => {
+  const raw = Array.from({ length: 85 }, (_, i) => entry(`u${i}`));
+  assert.equal(normalizeRoll(raw).length, 85);
 });
 
 test('normalizeRoll keeps playable video metadata and treats old entries as photos', () => {

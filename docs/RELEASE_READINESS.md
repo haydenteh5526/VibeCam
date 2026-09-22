@@ -13,7 +13,7 @@ cannot re-enable them, and API calls are rejected before reaching the network.
 ## Implemented in this pass
 
 - Captures and JPEG/PNG imports retain the original in app documents before developing.
-  The latest 60 shots are kept; the UI tells users to save favourites to Photos.
+  Film Roll keeps shots until the user deletes them; the UI suggests saving a separate copy to Photos.
 - Re-developing and AI results commit through one photo state. Preview, Save, Share,
   Upload and Film Roll use that exact edit. A failed edit keeps the previous image.
 - Film Roll migrates surviving old cached images, repairs missing original references,

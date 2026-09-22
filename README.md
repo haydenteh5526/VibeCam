@@ -22,7 +22,7 @@ explicitly keep this disabled.
 - **Pocket Camera Emulation** — Six compact-camera-inspired colour looks: Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD digicam, and Canon PowerShot
 - **Photo Character** — Offline highlight, vignette and sensor grain controls; video uses the selected camera's colour look
 - **On-device Developing** — Baked 3D LUTs render photos on the GPU and video during local export
-- **Film Roll** — The latest 60 photos and clips with their originals; tap an item to try another look
+- **Film Roll** — Photos and clips stay on the iPhone with their originals until you delete them; tap an item to try another look
 - **Durable Media** — Originals and edits survive cache eviction; preview, saving and sharing use the same committed media
 - **Photo Import** — Develop JPEG and PNG photos from Files, including when camera access is off
 - **Digicam Video** — Record up to 15 seconds with sound, apply the selected camera's colour look offline, and restyle from the original in Film Roll. Requires an iPhone preview or release build; Expo Go cannot load the local video module.

@@ -19,7 +19,7 @@ VibeCam develops photos and short videos on your iPhone with six distinct compac
 - Six camera looks, from warm and punchy to muted, crisp and nostalgic
 - Adjustable grain, vignette and highlight character for photos
 - Record 15-second clips with sound and the selected camera colour look
-- Film Roll with the latest 60 photos and clips, plus their originals
+- Film Roll keeps photos and clips, plus their originals, until you delete them
 - Try another look from the original photo or video without stacking edits
 - Hold to compare your edit with the original
 - Save to Photos or share through your favourite apps
