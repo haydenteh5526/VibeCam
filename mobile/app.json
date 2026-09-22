@@ -5,21 +5,22 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0c0c0c"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.vibecam.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow VibeCam to access the camera to take photos.",
-        "NSPhotoLibraryAddUsageDescription": "Allow VibeCam to save your graded photos to your photo library.",
-        "NSPhotoLibraryUsageDescription": "Allow VibeCam to save and access photos you capture in the app."
+        "NSCameraUsageDescription": "Allow VibeCam to take photos and short videos with digicam looks.",
+        "NSMicrophoneUsageDescription": "Allow VibeCam to record sound with your digicam videos.",
+        "NSPhotoLibraryAddUsageDescription": "Allow VibeCam to save styled photos and videos to your photo library.",
+        "NSPhotoLibraryUsageDescription": "Allow VibeCam to save photos and videos you capture in the app."
       }
     },
     "android": {
@@ -28,7 +29,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#1a1a2e"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -45,13 +46,22 @@
     },
     "owner": "hayyyyy",
     "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow VibeCam to take photos and short videos with digicam looks.",
+          "microphonePermission": "Allow VibeCam to record sound with your digicam videos.",
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-video",
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow VibeCam to save and access photos you capture in the app.",
-          "savePhotosPermission": "Allow VibeCam to save your graded photos to your photo library.",
-          "isAccessMediaLocationEnabled": false
+          "photosPermission": "Allow VibeCam to save photos and videos you capture in the app.",
+          "savePhotosPermission": "Allow VibeCam to save styled photos and videos to your photo library.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": ["photo", "video"]
         }
       ]
     ]

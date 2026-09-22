@@ -3,6 +3,16 @@
 Runbook for getting VibeCam onto a physical iPhone. Steps needing your accounts
 (Render, Apple ID) are marked **[you]**.
 
+For current validation results and required device checks, start with
+**[RELEASE_READINESS.md](RELEASE_READINESS.md)**. Originals and developed photos
+remain in Film Roll even when Photos permission is denied.
+
+**First iPhone release: offline features only.** No backend or API key is needed.
+Skip sections 1–3 and go to the device/build instructions in section 4. The server
+instructions are for optional future cloud development; enable that explicitly with
+`EXPO_PUBLIC_ENABLE_CLOUD_FEATURES=true` in a development environment. All EAS
+profiles explicitly disable it for this release.
+
 ---
 
 ## 1. Generate an API key
@@ -77,12 +87,14 @@ Hot reload is instant and browser devtools work. What does and doesn't apply:
 | Works on web | Doesn't |
 |---|---|
 | Every screen, layout, navigation | Saving to the photo library (no such thing in a browser) |
-| Settings and film roll (localStorage) | Haptics and sharing (silently ignored) |
-| Viewfinder via the laptop webcam | On-device GL developing is unverified here — use the backend path |
+| Settings and durable film roll (IndexedDB) | Native haptics and the iOS share sheet |
+| Viewfinder via the laptop webcam | Native on-device developing — web uses the backend path |
 | Capture, backend grading, re-develop | |
 
 `expo-file-system` does not exist on web, so binary I/O and persistence route through
-`src/services/storage.ts`, which falls back to blob URLs and localStorage in a browser.
+`src/services/storage.ts`, which stores durable image data in IndexedDB in a browser.
+JPEG and PNG import from Files is available without camera access, and Save downloads
+the current edit on web.
 
 Treat web as a **development surface only**: verify looks and camera behaviour on the
 phone, because a laptop webcam is nothing like an iPhone sensor.
@@ -154,11 +166,17 @@ Builds on Apple hardware in the cloud, so it works from Windows:
 
 ```bash
 cd mobile
-npx eas build -p ios --profile development   # install via the QR/link it prints
+npx eas-cli@latest build -p ios --profile preview   # install via the QR/link it prints
 ```
 
-Needs a free Apple ID for signing; a paid developer account isn't required for
-personal device installs.
+EAS builds for physical iPhones require an Apple Developer Program membership and
+device registration. A free Apple ID alone is insufficient for this cloud signing
+workflow. See [Expo's iOS device build guide](https://docs.expo.dev/tutorial/eas/ios-development-build-for-devices/).
+
+The `preview` profile embeds the app bundle and runs without Metro. The `development`
+profile is for a custom development client and still needs a development server.
+All profiles disable cloud access. The stored server URL is used only if you
+explicitly opt into future cloud development; it is never contacted by this release.
 
 ## 5. Camera settings — what actually matters
 

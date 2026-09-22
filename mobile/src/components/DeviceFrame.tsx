@@ -30,6 +30,11 @@ export function useLayoutWidth(): number {
   return isWeb ? Math.min(width, PHONE_WIDTH) : width;
 }
 
+export function useLayoutHeight(): number {
+  const { height } = useWindowDimensions();
+  return isWeb ? Math.min(PHONE_HEIGHT, Math.max(480, height - 48)) : height;
+}
+
 export function DeviceFrame({ children }: { children: React.ReactNode }) {
   const { height: windowHeight } = useWindowDimensions();
 

@@ -2,14 +2,14 @@
  * Film roll: the app's own record of developed shots.
  *
  * Pure logic, no native imports, so it can be unit-tested. The list is an index of
- * URIs plus metadata — the images themselves live on disk (cache/document dirs) and in
- * the photo library. Capped so the index can't grow without bound.
+ * URIs plus metadata — media files live in app documents; Save makes a separate copy
+ * in Photos. Capped so the index cannot grow without bound.
  */
 
 export type RollEntry = {
-  /** Developed image URI. */
+  /** Developed photo or styled video URI. */
   uri: string;
-  /** Untouched frame, kept so a shot can be re-developed later. */
+  /** Untouched recording, kept so an item can be restyled later. */
   originalUri: string | null;
   /** Camera id the shot was developed with, e.g. 'g7x'. */
   cameraId: string;
@@ -19,9 +19,14 @@ export type RollEntry = {
   takenAt: number;
   /** Seed used for leak/dust/grain, so a re-develop reproduces it exactly. */
   seed: number;
+  /** Omitted in old rolls; they contain photos. */
+  mediaType?: 'photo' | 'video';
+  /** First frame for a video tile. */
+  thumbnailUri?: string | null;
+  durationMs?: number;
 };
 
-/** Keeping the most recent 60 shots is plenty for a personal camera app. */
+/** Bound the app's local film roll; users save favourites to Photos. */
 export const MAX_ROLL = 60;
 
 export function addEntry(roll: RollEntry[], entry: RollEntry, max: number = MAX_ROLL): RollEntry[] {
@@ -54,6 +59,9 @@ export function normalizeRoll(raw: unknown, max: number = MAX_ROLL): RollEntry[]
       cameraName: typeof r.cameraName === 'string' ? r.cameraName : 'Unknown',
       takenAt: typeof r.takenAt === 'number' && Number.isFinite(r.takenAt) ? r.takenAt : 0,
       seed: typeof r.seed === 'number' && Number.isFinite(r.seed) ? Math.trunc(r.seed) : 0,
+      ...(r.mediaType === 'video' ? { mediaType: 'video' as const } : {}),
+      thumbnailUri: typeof r.thumbnailUri === 'string' && r.thumbnailUri.length > 0 ? r.thumbnailUri : null,
+      ...(r.mediaType === 'video' ? { durationMs: typeof r.durationMs === 'number' && Number.isFinite(r.durationMs) && r.durationMs >= 0 ? r.durationMs : 0 } : {}),
     });
   }
   return out.slice(0, max);

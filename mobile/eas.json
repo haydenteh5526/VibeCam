@@ -7,17 +7,20 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://127.0.0.1:8000"
+        "EXPO_PUBLIC_ENABLE_CLOUD_FEATURES": "false",
+        "EXPO_PUBLIC_API_BASE_URL": "https://vibecam-backend.onrender.com"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
+        "EXPO_PUBLIC_ENABLE_CLOUD_FEATURES": "false",
         "EXPO_PUBLIC_API_BASE_URL": "https://vibecam-backend.onrender.com"
       }
     },
     "production": {
       "env": {
+        "EXPO_PUBLIC_ENABLE_CLOUD_FEATURES": "false",
         "EXPO_PUBLIC_API_BASE_URL": "https://vibecam-backend.onrender.com"
       }
     }

@@ -1,10 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as Haptics from 'expo-haptics';
 import { VideoPreview } from '../components/VideoPreview';
 import { DevelopingOverlay } from '../components/DevelopingOverlay';
-import { gradeWithVibe } from '../services/api';
 import { FILTERS, type FilterId } from '../filters';
 import type { SelectedFile } from '../types';
 import type { GradeState } from '../../App';
@@ -15,8 +13,15 @@ type Props = {
   /** Ungraded frame — re-grading always starts from this so looks never stack. */
   original: string | null;
   backendReady: boolean;
+  cloudEnabled: boolean;
   grade: GradeState;
   saved: boolean;
+  busy: boolean;
+  canDevelop: boolean;
+  selectedCamera: string;
+  error: string;
+  notice: string;
+  onVibe: (vibe: string) => void;
   onRegrade: (camera: FilterId | 'auto') => void;
   onClose: () => void;
   onSave: () => void;
@@ -26,64 +31,26 @@ type Props = {
 };
 
 export function PreviewScreen({
-  file, captured, original, backendReady, grade, saved,
+  file, captured, original, backendReady, cloudEnabled, grade, saved, busy, canDevelop, selectedCamera, error, notice, onVibe,
   onRegrade, onClose, onSave, onShare, onUpload, onDelete,
 }: Props) {
   const isVid = file.mimeType.startsWith('video/');
-  const translateY = useRef(new Animated.Value(0)).current;
   const [vibe, setVibe] = useState('');
-  const [vibeLoading, setVibeLoading] = useState(false);
-  const [vibeResult, setVibeResult] = useState<string | null>(null);
-  const [vibeUri, setVibeUri] = useState<string | null>(null);
-  const [selected, setSelected] = useState<FilterId | 'auto' | null>(null);
   const [showOriginal, setShowOriginal] = useState(false);
-
-  const busy = grade.kind === 'grading' || vibeLoading;
-  // A vibe grade overrides the camera look; press-and-hold shows the untouched frame.
-  const displayUri = showOriginal ? original : (vibeUri ?? captured);
-
-  const applyVibe = async () => {
-    if (!vibe.trim() || !original) return;
-    setVibeLoading(true);
-    try {
-      const result = await gradeWithVibe(original, vibe.trim());
-      setVibeUri(result.gradedUri);
-      setVibeResult(result.styleName);
-    } catch { /* keep the current image */ }
-    finally { setVibeLoading(false); }
-  };
-
-  const pickCamera = (id: FilterId | 'auto') => {
-    if (busy || !backendReady) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelected(id);
-    setVibeUri(null); setVibeResult(null);   // camera look replaces any vibe grade
-    onRegrade(id);
-  };
-
-  const panResponder = useRef(PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 15 && Math.abs(g.dx) < 30,
-    onPanResponderMove: (_, g) => { translateY.setValue(g.dy); },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > 100 || g.vy > 0.5) { Animated.timing(translateY, { toValue: 600, duration: 200, useNativeDriver: true }).start(onClose); }
-      else { Animated.spring(translateY, { toValue: 0, friction: 7, useNativeDriver: true }).start(); }
-    },
-  })).current;
-
-  const statusLabel = (() => {
-    if (grade.kind === 'grading') return 'Developing…';
-    if (vibeResult) return vibeResult;
-    if (grade.kind === 'graded') return `\uD83D\uDCF7  ${grade.name}`;
-    if (grade.kind === 'failed') return 'Ungraded — grading failed';
-    if (!backendReady) return 'Ungraded — backend offline';
-    return null;
-  })();
-  const statusWarn = grade.kind === 'failed' || (!backendReady && grade.kind === 'none');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const selected = selectedCamera;
+  const displayUri = showOriginal ? original : captured;
+  const canRegrade = !!original && !busy;
+  const canVibe = !!original && backendReady && !busy && !!vibe.trim();
+  const applyVibe = () => { if (canVibe) onVibe(vibe.trim()); };
+  const pickCamera = (id: FilterId | 'auto') => { if (canRegrade && (id === 'original' || canDevelop)) onRegrade(id); };
+  const statusLabel = grade.kind === 'grading' ? 'Developing...'
+    : grade.kind === 'graded' ? grade.name : 'Original';
 
   return (
-    <Animated.View style={[s.bg, { transform: [{ translateY }] }]}>
+    <View style={s.bg}>
       <StatusBar style="light" />
-      <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
+      <View style={StyleSheet.absoluteFill}>
         {isVid && displayUri ? (
           <VideoPreview uri={displayUri} />
         ) : displayUri ? (
@@ -92,24 +59,24 @@ export function PreviewScreen({
       </View>
 
       {/* Darkroom overlay while the shot is being rendered */}
-      {busy && <DevelopingOverlay label={vibeLoading ? 'Grading' : 'Developing'} />}
+      {grade.kind === 'grading' && <DevelopingOverlay label="Developing" />}
 
       {/* Top bar */}
       <View style={s.top}>
-        <Pressable onPress={onClose} style={s.pill}><Text style={s.pillT}>Close</Text></Pressable>
-        <Pressable onPress={onDelete} style={s.pillDanger}><Text style={s.pillDangerT}>Delete</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={onClose} disabled={busy} style={[s.pill, busy && s.dis]}><Text style={s.pillT}>Close</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => setConfirmDelete(true)} disabled={busy} style={[s.pillDanger, busy && s.dis]}><Text style={s.pillDangerT}>Delete</Text></Pressable>
       </View>
 
       {/* Status: which look is applied, or why none is */}
       {statusLabel && (
-        <View style={[s.badge, statusWarn && s.badgeWarn]}>
+        <View style={s.badge}>
           {grade.kind === 'grading' && <ActivityIndicator size="small" color="#FFD60A" />}
-          <Text style={[s.badgeT, statusWarn && s.badgeTWarn]}>{statusLabel}</Text>
+          <Text style={s.badgeT}>{statusLabel}</Text>
         </View>
       )}
 
       {/* Saved-to-camera-roll confirmation */}
-      {saved && !busy && <View style={s.savedTag}><Text style={s.savedTagT}>Saved to Photos</Text></View>}
+      {saved && !busy && <View style={s.savedTag}><Text style={s.savedTagT}>{Platform.OS === 'web' ? 'Download started' : 'Saved to Photos'}</Text></View>}
 
       {/* Hold to compare against the untouched frame */}
       {!isVid && original && captured !== original && (
@@ -124,22 +91,35 @@ export function PreviewScreen({
 
       {/* Bottom */}
       <View style={s.bot}>
+        {error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text> : null}
+        {notice ? <Text style={s.notice}>{notice}</Text> : null}
+        {confirmDelete && <View style={s.confirm}>
+          <Text style={s.notice}>Delete this {isVid ? 'clip' : 'photo'} and its original from Film Roll? Copies saved to Photos stay there.</Text>
+          <View style={s.row}>
+            <Pressable onPress={() => setConfirmDelete(false)} disabled={busy} style={s.act}><Text style={s.actT}>Keep</Text></Pressable>
+            <Pressable onPress={onDelete} disabled={busy} style={s.pillDanger}><Text style={s.pillDangerT}>Delete from roll</Text></Pressable>
+          </View>
+        </View>}
         {/* Re-grade with any camera, without reshooting */}
-        {!isVid && (
+        {(
           <>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.strip}>
-              <Pressable
+              {cloudEnabled && <Pressable
                 onPress={() => pickCamera('auto')}
-                style={[s.chip, selected === 'auto' && s.chipOn, !backendReady && s.dis]}
+                disabled={!canRegrade || !canDevelop}
+                accessibilityRole="button"
+                style={[s.chip, selected === 'auto' && s.chipOn, (!canRegrade || !canDevelop) && s.dis]}
               >
                 <View style={[s.dot, { backgroundColor: '#22c55e' }]} />
                 <Text style={[s.chipT, selected === 'auto' && s.chipTOn]}>Auto</Text>
-              </Pressable>
-              {FILTERS.filter(f => f.id !== 'original').map(f => (
+              </Pressable>}
+              {FILTERS.map(f => (
                 <Pressable
                   key={f.id}
                   onPress={() => pickCamera(f.id)}
-                  style={[s.chip, selected === f.id && s.chipOn, !backendReady && s.dis]}
+                  disabled={!canRegrade || (f.id !== 'original' && !canDevelop)}
+                  accessibilityRole="button"
+                  style={[s.chip, selected === f.id && s.chipOn, (!canRegrade || (f.id !== 'original' && !canDevelop)) && s.dis]}
                 >
                   <View style={[s.dot, { backgroundColor: f.dot }]} />
                   <Text style={[s.chipT, selected === f.id && s.chipTOn]}>{f.name}</Text>
@@ -147,15 +127,18 @@ export function PreviewScreen({
               ))}
             </ScrollView>
             <Text style={s.hint}>
-              {backendReady ? 'Tap a camera to re-develop this shot' : 'Connect the backend to change the look'}
+              {!original ? 'Original unavailable; this saved edit can still be exported.' : canDevelop ? isVid ? 'Tap a camera to style this video' : 'Tap a camera to re-develop this shot' : cloudEnabled ? 'Connect to change the look' : 'Camera looks are available in the iPhone app'}
             </Text>
           </>
         )}
 
         {/* Vibe input */}
-        <View style={s.vibeRow}>
+        {cloudEnabled && !isVid && original && backendReady && <View style={s.vibeRow}>
           <TextInput
             style={s.vibeInput}
+            editable={!busy}
+            maxLength={300}
+            accessibilityLabel="Describe a vibe"
             placeholder="Describe a vibe... (e.g. warm nostalgic sunset)"
             placeholderTextColor="#636366"
             value={vibe}
@@ -163,25 +146,28 @@ export function PreviewScreen({
             returnKeyType="go"
             onSubmitEditing={applyVibe}
           />
-          <Pressable onPress={applyVibe} style={[s.vibeBtn, (!vibe.trim() || busy) && s.dis]} disabled={!vibe.trim() || busy}>
-            {vibeLoading ? <ActivityIndicator size="small" color="#000" /> : <Text style={s.vibeBtnT}>Grade</Text>}
+          <Pressable onPress={applyVibe} style={[s.vibeBtn, (!canVibe) && s.dis]} disabled={!canVibe}>
+            <Text style={s.vibeBtnT}>Grade</Text>
           </Pressable>
-        </View>
+        </View>}
 
         {/* Actions */}
         <View style={s.row}>
-          <Pressable onPress={onSave} style={[s.act, busy && s.dis]} disabled={busy}>
-            <Text style={s.actT}>{saved ? 'Saved ✓' : 'Save'}</Text>
+          <Pressable accessibilityRole="button" onPress={onSave} style={[s.act, (busy || saved) && s.dis]} disabled={busy || saved}>
+            <Text style={s.actT}>{saved ? 'Saved ✓' : Platform.OS === 'web' ? 'Download' : 'Save'}</Text>
           </Pressable>
-          <Pressable onPress={onShare} style={[s.act, busy && s.dis]} disabled={busy}><Text style={s.actT}>Share</Text></Pressable>
-          <Pressable onPress={onUpload} style={[s.up, (!backendReady || busy) && s.dis]} disabled={!backendReady || busy}><Text style={s.upT}>Upload</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={onShare} style={[s.act, busy && s.dis]} disabled={busy}><Text style={s.actT}>Share</Text></Pressable>
+          {cloudEnabled && <Pressable accessibilityRole="button" onPress={onUpload} style={[s.up, (!backendReady || busy) && s.dis]} disabled={!backendReady || busy}><Text style={s.upT}>Upload</Text></Pressable>}
         </View>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
+  error: { color: '#ff9b9b', backgroundColor: '#291616', borderRadius: 8, padding: 10, fontSize: 12, lineHeight: 17 },
+  notice: { color: '#d1d1d6', fontSize: 12, lineHeight: 17 },
+  confirm: { backgroundColor: '#1c1c1e', borderRadius: 10, padding: 12, gap: 10 },
   bg: { flex: 1, backgroundColor: '#0c0c0c' },
   top: { position: 'absolute', top: 52, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between' },
   pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: 'rgba(28,28,30,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },

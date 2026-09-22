@@ -1,306 +1,279 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, BackHandler, Linking, Platform, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { useCameraPermissions } from 'expo-camera';
 
 import { PermissionScreen, GalleryScreen, DoneScreen, UploadingScreen, PreviewScreen, CameraScreen, SettingsScreen, RollScreen } from './src/screens';
-import { checkHealth, fetchGallery, uploadFile, gradePhoto } from './src/services/api';
-import { DEFAULT_SETTINGS, gradeHeaders, loadSettings, saveSettings, type Settings } from './src/settings';
-import { addEntry, loadRoll, pruneMissing, removeEntry, saveRoll, updateEntry, type RollEntry } from './src/rollStore';
+import { checkHealth, fetchGallery, uploadFile, gradePhoto, gradeWithVibe } from './src/services/api';
+import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from './src/settings';
+import { rollStore, type RollEntry } from './src/rollStore';
 import { developOnDevice, hasOnDeviceLook } from './src/look/renderStill';
+import { developVideoOnDevice, hasVideoLooks } from './src/look/renderVideo';
+import { developPhoto, type DevelopedPhoto } from './src/developPhoto';
 import { DeviceFrame } from './src/components/DeviceFrame';
-import { FILTERS } from './src/filters';
 import type { AppScreen, GalleryItem, SelectedFile } from './src/types';
-import type { FilterId } from './src/filters';
+import { FILTERS, type FilterId } from './src/filters';
+import { CLOUD_FEATURES_ENABLED } from './src/constants';
+import { settingsForReleaseMode } from './src/releaseMode';
 
-/** Outcome of the capture-time grade, so the UI can be honest about what happened. */
-export type GradeState =
-  | { kind: 'none' }                                  // no grade attempted (backend down)
-  | { kind: 'grading' }
-  | { kind: 'graded'; name: string }
-  | { kind: 'failed' };                               // attempted, but the photo is ungraded
+export type GradeState = { kind: 'none' } | { kind: 'grading' } | { kind: 'graded'; name: string };
+
+const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+const fileFor = (entry: RollEntry): SelectedFile => {
+  if (entry.mediaType === 'video') {
+    const mov = /\.mov$/i.test(entry.uri);
+    return { uri: entry.uri, name: `VID_${entry.takenAt}.${mov ? 'mov' : 'mp4'}`,
+      mimeType: mov ? 'video/quicktime' : 'video/mp4', sizeBytes: null };
+  }
+  const png = entry.uri.startsWith('data:image/png') || /\.png$/i.test(entry.uri);
+  return { uri: entry.uri, name: `IMG_${entry.takenAt}.${png ? 'png' : 'jpg'}`, mimeType: png ? 'image/png' : 'image/jpeg', sizeBytes: null };
+};
 
 export default function App() {
-  const [camPerm, requestCam] = useCameraPermissions();
+  const [camPerm, requestCam, refreshCam] = useCameraPermissions();
   const [screen, setScreen] = useState<AppScreen>('camera');
+  const [loaded, setLoaded] = useState(false);
+  const [startupError, setStartupError] = useState('');
   const [backend, setBackend] = useState(false);
-  // `captured` is what's on screen; `original` is the ungraded frame kept so the
-  // preview can re-grade with a different camera without stacking looks.
-  const [captured, setCaptured] = useState<string | null>(null);
-  const [original, setOriginal] = useState<string | null>(null);
-  const [lastThumb, setLastThumb] = useState<string | null>(null);
-  const [file, setFile] = useState<SelectedFile | null>(null);
+  // Every preview, export and upload derives from this one committed photo.
+  const [photo, setPhoto] = useState<RollEntry | null>(null);
+  const [roll, setRoll] = useState<RollEntry[]>([]);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [working, setWorking] = useState(false);
+  const [developing, setDeveloping] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [progress, setProgress] = useState(0);
   const [hash, setHash] = useState<string | null>(null);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
-  const [grade, setGrade] = useState<GradeState>({ kind: 'none' });
-  const [saved, setSaved] = useState(false);
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [roll, setRoll] = useState<RollEntry[]>([]);
-  // One seed per captured frame, so re-developing reproduces the same leak/dust/grain.
-  const [seed, setSeed] = useState(0);
+  // A ref closes the gap before React renders disabled controls after a rapid double tap.
+  const locked = useRef(false);
+  const settingsWrites = useRef<Promise<void>>(Promise.resolve());
+  const effectiveSettings = settingsForReleaseMode(settings, CLOUD_FEATURES_ENABLED);
 
-  // Poll health until the backend answers. The free Render instance sleeps, so the first
-  // check can take ~30s — a single attempt would leave the UI stuck on "offline".
+  const initialize = useCallback(async () => {
+    setStartupError('');
+    try {
+      const [storedSettings, storedRoll] = await Promise.all([loadSettings(), rollStore.load()]);
+      setSettings(storedSettings); setRoll(storedRoll); setLoaded(true);
+    } catch { setStartupError('Could not open your film roll. Free some storage and retry.'); }
+  }, []);
+  useEffect(() => { void initialize(); }, [initialize]);
+
   useEffect(() => {
-    let cancelled = false;
-    let attempts = 0;
-    const tick = async () => {
-      if (cancelled) return;
-      const ok = await checkHealth();
-      if (cancelled) return;
-      setBackend(ok);
-      attempts += 1;
-      // Keep retrying for a few minutes, backing off, then stop pestering it.
-      if (!ok && attempts < 8) setTimeout(tick, Math.min(30_000, 3_000 * attempts));
+    if (!CLOUD_FEATURES_ENABLED) return;
+    let stopped = false;
+    let checking = false;
+    const check = async () => {
+      if (checking || AppState.currentState === 'background') return;
+      checking = true;
+      const ready = await checkHealth();
+      checking = false;
+      if (!stopped) setBackend(ready);
     };
-    void tick();
-    return () => { cancelled = true; };
-  }, []);
-  useEffect(() => { loadSettings().then(setSettings); }, []);
-  // Prune shots whose cached image iOS has since purged, so the roll has no dead tiles.
-  useEffect(() => { loadRoll().then(pruneMissing).then(setRoll); }, []);
-
-  /** Update the roll and persist it. */
-  const commitRoll = useCallback((next: RollEntry[]) => {
-    setRoll(next);
-    void saveRoll(next);
-  }, []);
-
-  const updateSettings = useCallback((patch: Partial<Settings>) => {
-    setSettings(prev => {
-      const next = { ...prev, ...patch };
-      void saveSettings(next);
-      return next;
+    void check();
+    const timer = setInterval(() => void check(), 30_000);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void check();
     });
-  }, []);
-
-  const buzz = useCallback((style: Haptics.ImpactFeedbackStyle) => {
-    if (settings.haptics) void Haptics.impactAsync(style);
-  }, [settings.haptics]);
-
-  /** Write a finished image to the device photo library. Returns true on success. */
-  const saveToLibrary = useCallback(async (uri: string): Promise<boolean> => {
-    try {
-      const perm = await MediaLibrary.getPermissionsAsync();
-      const granted = perm.granted || (await MediaLibrary.requestPermissionsAsync()).granted;
-      if (!granted) return false;
-      await MediaLibrary.saveToLibraryAsync(uri);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  /**
-   * Develop a frame, preferring whichever path the situation calls for.
-   *
-   * On-device is instant and works offline but is an approximation; the backend applies
-   * the adaptive reference match and the full character layer. On-device is used when the
-   * user asks for it or when the backend isn't reachable, and it also serves as the
-   * fallback if a backend request fails.
-   */
-  const develop = useCallback(async (
-    uri: string,
-    camera: FilterId | 'auto',
-    shotSeed: number,
-  ): Promise<{ uri: string; id: string; name: string } | null> => {
-    const localFirst = settings.onDeviceLook || !backend;
-    const localCamera = camera === 'auto' ? 'g7x' : camera;   // no scene analysis offline
-
-    if (localFirst && hasOnDeviceLook(localCamera)) {
-      try {
-        const out = await developOnDevice({
-          uri, camera: localCamera, characterStrength: settings.characterStrength, seed: shotSeed,
-        });
-        if (out) {
-          const meta = FILTERS.find(f => f.id === localCamera);
-          return { uri: out, id: localCamera, name: meta ? `${meta.name} · on device` : localCamera };
-        }
-      } catch {
-        // Fall through to the backend, or to returning the untouched frame.
-      }
-    }
-
-    if (!backend) return null;
-    try {
-      const r = await gradePhoto(uri, camera, gradeHeaders(settings, shotSeed));
-      return { uri: r.gradedUri, id: r.presetId, name: r.presetName };
-    } catch {
-      return null;
-    }
-  }, [backend, settings]);
-
-  // Photo captured -> apply the selected pocket-camera emulation, then save the
-  // *graded* result to the camera roll (that's the photo the user actually wants).
-  const onCapture = useCallback(async (f: SelectedFile, uri: string, camera: FilterId | 'auto') => {
-    const shotSeed = Math.floor(Math.random() * 1_000_000);
-    setSeed(shotSeed);
-    setFile(f); setCaptured(uri); setOriginal(uri); setSaved(false);
-    setLastThumb(uri);
-    setScreen('preview');
-
-    if (settings.saveOriginal) void saveToLibrary(uri);
-
-    const canDevelop = backend || (settings.onDeviceLook || !backend);
-    if (!canDevelop) {
-      setGrade({ kind: 'none' });
-      setSaved(settings.autoSave ? await saveToLibrary(uri) : false);
-      return;
-    }
-
-    setGrade({ kind: 'grading' });
-    const result = await develop(uri, camera, shotSeed);
-    if (!result) {
-      // Nothing worked — keep the original and say so rather than pretending.
-      setGrade(backend || settings.onDeviceLook ? { kind: 'failed' } : { kind: 'none' });
-      setSaved(settings.autoSave ? await saveToLibrary(uri) : false);
-      return;
-    }
-
-    setCaptured(result.uri);
-    setLastThumb(result.uri);
-    setFile({ ...f, uri: result.uri });
-    setGrade({ kind: 'graded', name: result.name });
-    setSaved(settings.autoSave ? await saveToLibrary(result.uri) : false);
-    commitRoll(addEntry(roll, {
-      uri: result.uri,
-      originalUri: uri,
-      cameraId: result.id,
-      cameraName: result.name,
-      takenAt: Date.now(),
-      seed: shotSeed,
-    }));
-  }, [backend, saveToLibrary, settings, roll, commitRoll, develop]);
-
-  /** Re-grade the original frame with another camera, from the preview screen. */
-  const onRegrade = useCallback(async (camera: FilterId | 'auto') => {
-    if (!original) return;
-    const previous = captured;
-    setGrade({ kind: 'grading' }); setSaved(false);
-    const result = await develop(original, camera, seed);
-    if (!result) {
-      setGrade({ kind: 'failed' });
-      return;
-    }
-    setCaptured(result.uri);
-    setLastThumb(result.uri);
-    setFile(prev => (prev ? { ...prev, uri: result.uri } : prev));
-    setGrade({ kind: 'graded', name: result.name });
-    buzz(Haptics.ImpactFeedbackStyle.Light);
-    // Replace the roll entry in place so re-developing doesn't create duplicates.
-    commitRoll(previous
-      ? updateEntry(roll, previous, { uri: result.uri, cameraId: result.id, cameraName: result.name })
-      : addEntry(roll, {
-          uri: result.uri, originalUri: original, cameraId: result.id,
-          cameraName: result.name, takenAt: Date.now(), seed,
-        }));
-  }, [original, captured, seed, buzz, roll, commitRoll, develop]);
-
-  /** Open a shot from the film roll, ready to re-develop. */
-  const onOpenRollEntry = useCallback((entry: RollEntry) => {
-    setCaptured(entry.uri);
-    setOriginal(entry.originalUri ?? entry.uri);
-    setSeed(entry.seed);
-    setFile({ uri: entry.uri, name: `IMG_${entry.takenAt}.jpg`, mimeType: 'image/jpeg', sizeBytes: null });
-    setGrade({ kind: 'graded', name: entry.cameraName });
-    setSaved(false);
-    setScreen('preview');
-  }, []);
-
-  /** Explicit save from the preview screen (also used to retry a failed auto-save). */
-  const onSave = useCallback(async () => {
-    if (!file) return;
-    const ok = await saveToLibrary(file.uri);
-    setSaved(ok);
-    if (settings.haptics) {
-      await Haptics.notificationAsync(
-        ok ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
-      );
-    }
-  }, [file, saveToLibrary, settings.haptics]);
-
-  const onShare = useCallback(async () => {
-    if (!file || !(await Sharing.isAvailableAsync())) return;
-    await Sharing.shareAsync(file.uri);
-  }, [file]);
-
-  // Optional cloud upload (secondary feature)
-  const onUpload = useCallback(async () => {
-    if (!file) return;
-    setScreen('uploading'); setProgress(0); setHash(null);
-    try {
-      const h = await uploadFile(file, setProgress);
-      if (settings.haptics) await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setHash(h); setScreen('done');
-    } catch {
-      if (settings.haptics) await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setScreen('preview');
-    }
-  }, [file, settings.haptics]);
-
-  const onGallery = useCallback(async () => {
-    try { const items = await fetchGallery(); setGallery(items); } catch { setGallery([]); }
-    setScreen('gallery');
-  }, []);
-
-  /** Remove the current shot from the film roll and return to the camera. */
-  const onDelete = useCallback(() => {
-    if (captured) commitRoll(removeEntry(roll, captured));
-    setCaptured(null); setOriginal(null); setFile(null);
-    setGrade({ kind: 'none' }); setSaved(false); setScreen('camera');
-  }, [captured, roll, commitRoll]);
+    return () => { stopped = true; clearInterval(timer); subscription.remove(); };
+  }, [refreshCam]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void refreshCam();
+    });
+    return () => subscription.remove();
+  }, [refreshCam]);
 
   const reset = useCallback(() => {
-    setCaptured(null); setOriginal(null); setFile(null); setProgress(0); setHash(null);
-    setGrade({ kind: 'none' }); setSaved(false); setScreen('camera');
+    if (locked.current) return;
+    setPhoto(null); setSaved(false); setError(''); setNotice(''); setScreen('camera');
   }, []);
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (locked.current) return true;
+      if (screen === 'camera') return false;
+      reset(); return true;
+    });
+    return () => subscription.remove();
+  }, [screen, reset]);
 
-  // Extracted so the whole app can be wrapped in the web device frame in one place.
-  const renderScreen = () => {
-  if (!camPerm?.granted) return <PermissionScreen onAllow={requestCam} />;
-  if (screen === 'settings') {
-    return <SettingsScreen settings={settings} onChange={updateSettings} onClose={() => setScreen('camera')} />;
-  }
-  if (screen === 'roll') {
-    return <RollScreen roll={roll} onOpen={onOpenRollEntry} onBack={() => setScreen('camera')} />;
-  }
-  if (screen === 'gallery') return <GalleryScreen gallery={gallery} onBack={reset} />;
-  if (screen === 'done') return <DoneScreen hash={hash} onGallery={onGallery} onNew={reset} />;
-  if (screen === 'uploading') return <UploadingScreen progress={progress} />;
-  if (screen === 'preview' && file) {
-    return (
-      <PreviewScreen
-        file={file}
-        captured={captured}
-        original={original}
-        backendReady={backend}
-        grade={grade}
-        saved={saved}
-        onRegrade={onRegrade}
-        onClose={reset}
-        onSave={onSave}
-        onShare={onShare}
-        onUpload={onUpload}
-        onDelete={onDelete}
-      />
-    );
-  }
-  return (
-    <CameraScreen
-      onCapture={onCapture}
-      onGallery={() => setScreen('roll')}
-      onSettings={() => setScreen('settings')}
-      lastThumb={lastThumb}
-      backendReady={backend}
-      settings={settings}
-    />
+  const feedback = useCallback(() => {
+    if (settings.haptics && Platform.OS !== 'web') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }, [settings.haptics]);
+  const run = async (action: () => Promise<void>) => {
+    if (locked.current) return;
+    locked.current = true; setWorking(true); setError(''); setNotice('');
+    try { await action(); }
+    catch (e) { setError(message(e)); }
+    finally { locked.current = false; setWorking(false); setDeveloping(false); }
+  };
+  const commitPhoto = async (entry: RollEntry, previousUri?: string) => {
+    const committed = await rollStore.put(entry, previousUri);
+    setRoll(committed.roll); setPhoto(committed.entry);
+    return committed.entry;
+  };
+  const saveToLibrary = async (uri: string, mediaType: 'photo' | 'video' = 'photo') => {
+    if (Platform.OS === 'web') {
+      const link = document.createElement('a');
+      const extension = mediaType === 'video' ? /\.mov$/i.test(uri) ? 'mov' : 'mp4' : uri.startsWith('data:image/png') ? 'png' : 'jpg';
+      link.href = uri; link.download = `VibeCam_${Date.now()}.${extension}`; link.click();
+      return;
+    }
+    const current = await MediaLibrary.getPermissionsAsync(true, [mediaType]);
+    const permission = current.granted || (current.canAskAgain && (await MediaLibrary.requestPermissionsAsync(true, [mediaType])).granted);
+    if (!permission) throw new Error('Photos access is off. Enable “Add Photos” for VibeCam in Settings, then tap Save again. Your item is kept in Film Roll.');
+    await MediaLibrary.saveToLibraryAsync(uri);
+  };
+  const develop = (entry: RollEntry, camera: FilterId | 'auto') => developPhoto(
+    entry.originalUri!, camera, entry.seed, entry.takenAt, effectiveSettings, CLOUD_FEATURES_ENABLED && backend, {
+      local: (uri, id, characterStrength, seed) => developOnDevice({ uri, camera: id, characterStrength, seed }),
+      remote: async (uri, id, headers) => {
+        const result = await gradePhoto(uri, id, headers);
+        return { uri: result.gradedUri, id: result.presetId, name: result.presetName };
+      },
+    },
   );
+  const applyResult = async (entry: RollEntry, result: DevelopedPhoto) => {
+    const next = await commitPhoto({ ...entry, uri: result.uri, cameraId: result.id, cameraName: result.name }, entry.uri);
+    setSaved(false); setNotice(result.notice ?? '');
+    return next;
+  };
+  const capturePhoto = async (uri: string, camera: FilterId | 'auto') => {
+    let entry: RollEntry = { uri, originalUri: uri, cameraId: 'original', cameraName: 'Original', takenAt: Date.now(), seed: Math.floor(Math.random() * 1_000_000) };
+    setPhoto(entry); setSaved(false); setScreen('preview'); setDeveloping(true);
+    // Retain the original before either renderer can fail or the app can leave preview.
+    try { entry = await commitPhoto(entry); }
+    catch { throw new Error('Could not keep this photo in Film Roll. Free some storage, or tap Save to keep it in Photos before closing.'); }
+    if (Platform.OS === 'web' && !CLOUD_FEATURES_ENABLED) {
+      setNotice('Photo retained. Camera looks run in the iPhone app.');
+    } else {
+      try { entry = await applyResult(entry, await develop(entry, camera)); }
+      catch (e) { setError(message(e)); }
+    }
+    setDeveloping(false);
+    if (settings.saveOriginal && (!settings.autoSave || entry.originalUri !== entry.uri)) await saveToLibrary(entry.originalUri!);
+    if (settings.autoSave) { await saveToLibrary(entry.uri); setSaved(true); }
+  };
+  const onCapture = (_file: SelectedFile, uri: string, camera: FilterId | 'auto') => run(() => capturePhoto(uri, camera));
+  const captureVideo = async (uri: string, camera: FilterId | 'auto', durationMs: number) => {
+    if (!hasVideoLooks()) throw new Error('Video looks require the iPhone preview or release app.');
+    let entry: RollEntry = { uri, originalUri: uri, cameraId: 'original', cameraName: 'Original',
+      takenAt: Date.now(), seed: 0, mediaType: 'video', thumbnailUri: null, durationMs };
+    setPhoto(entry); setSaved(false); setScreen('preview'); setDeveloping(true);
+    try { entry = await commitPhoto(entry); }
+    catch { throw new Error('Could not keep this video in Film Roll. Free some storage and try again.'); }
+    const selected = camera === 'auto' ? 'g7x' : camera;
+    try {
+      const result = await developVideoOnDevice(entry.originalUri!, selected);
+      const filter = FILTERS.find(item => item.id === selected);
+      entry = await commitPhoto({ ...entry, uri: result.uri, thumbnailUri: result.thumbnailUri,
+        cameraId: selected, cameraName: filter?.name ?? 'Original' }, entry.uri);
+    } catch (e) {
+      setError(message(e));
+      // A failed render never discards the recorded original.
+      try {
+        const original = await developVideoOnDevice(entry.originalUri!, 'original');
+        entry = await commitPhoto({ ...entry, thumbnailUri: original.thumbnailUri }, entry.uri);
+      } catch { /* The playable original remains in Film Roll. */ }
+    }
+    setDeveloping(false);
+    if (settings.saveOriginal && (!settings.autoSave || entry.originalUri !== entry.uri)) await saveToLibrary(entry.originalUri!, 'video');
+    if (settings.autoSave) { await saveToLibrary(entry.uri, 'video'); setSaved(true); }
+  };
+  const onCaptureVideo = (uri: string, camera: FilterId | 'auto', durationMs: number) => run(() => captureVideo(uri, camera, durationMs));
+  const onImport = () => run(async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ['image/jpeg', 'image/png'], copyToCacheDirectory: true, multiple: false });
+    if (!result.canceled) await capturePhoto(result.assets[0].uri, effectiveSettings.defaultCamera);
+  });
+  const onRegrade = (camera: FilterId | 'auto') => run(async () => {
+    if (!photo?.originalUri) return;
+    setDeveloping(true);
+    if (photo.mediaType === 'video') {
+      const selected = camera === 'auto' ? 'g7x' : camera;
+      const result = await developVideoOnDevice(photo.originalUri, selected);
+      const filter = FILTERS.find(item => item.id === selected);
+      await commitPhoto({ ...photo, uri: result.uri, thumbnailUri: result.thumbnailUri,
+        cameraId: selected, cameraName: filter?.name ?? 'Original' }, photo.uri);
+      setSaved(false); feedback(); return;
+    }
+    await applyResult(photo, await develop(photo, camera)); feedback();
+  });
+  const onVibe = (vibe: string) => run(async () => {
+    if (!photo?.originalUri || !backend || !vibe.trim()) return;
+    setDeveloping(true);
+    const result = await gradeWithVibe(photo.originalUri, vibe.trim());
+    await applyResult(photo, { uri: result.gradedUri, id: 'ai', name: result.styleName }); feedback();
+  });
+  const onSave = () => run(async () => {
+    if (!photo || saved) return;
+    await saveToLibrary(photo.uri, photo.mediaType); setSaved(true); feedback();
+  });
+  const onShare = () => run(async () => {
+    if (!photo) return;
+    if (!await Sharing.isAvailableAsync()) throw new Error('Sharing is unavailable here. Use Save to download your photo.');
+    const file = fileFor(photo);
+    await Sharing.shareAsync(photo.uri, { mimeType: file.mimeType,
+      UTI: file.mimeType === 'video/mp4' ? 'public.mpeg-4' : file.mimeType === 'video/quicktime' ? 'com.apple.quicktime-movie' : file.mimeType === 'image/png' ? 'public.png' : 'public.jpeg' });
+  });
+  const onDelete = () => run(async () => {
+    if (!photo) return;
+    setRoll(await rollStore.remove(photo.uri)); setPhoto(null); setSaved(false); setScreen('camera');
+  });
+  const onUpload = () => run(async () => {
+    if (!photo) return;
+    setScreen('uploading'); setProgress(0); setHash(null);
+    try {
+      const result = await uploadFile(fileFor(photo), setProgress);
+      setHash(result); setScreen('done'); feedback();
+    } catch (e) { setScreen('preview'); throw e; }
+  });
+  const onGallery = () => run(async () => {
+    setGallery(await fetchGallery()); setScreen('gallery');
+  });
+  const updateSettings = (patch: Partial<Settings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    settingsWrites.current = settingsWrites.current.then(() => saveSettings(next)).catch(() => {
+      setError('Could not save settings. Free some storage and try again.');
+    });
+  };
+  const onOpenRollEntry = (entry: RollEntry) => {
+    setPhoto(entry); setSaved(false); setError(''); setNotice(''); setScreen('preview');
   };
 
-  // On a device this renders children directly; in a browser it constrains the app to an
-  // iPhone-sized frame so laptop development matches what the phone will show.
+  const renderScreen = () => {
+    if (!loaded) return <View style={{ flex: 1, backgroundColor: '#0c0c0c', justifyContent: 'center', alignItems: 'center', padding: 28 }}>
+      {startupError ? <><Text style={{ color: '#fff', textAlign: 'center' }}>{startupError}</Text><Pressable onPress={initialize} style={{ padding: 20 }}><Text style={{ color: '#FFD60A' }}>Retry</Text></Pressable></> : <ActivityIndicator color="#FFD60A" />}
+    </View>;
+    if (screen === 'settings') return <SettingsScreen settings={effectiveSettings} onChange={updateSettings} onClose={reset} error={error} cloudEnabled={CLOUD_FEATURES_ENABLED} />;
+    if (screen === 'roll') return <RollScreen roll={roll} onOpen={onOpenRollEntry} onBack={reset} onImport={onImport} onSettings={() => { setError(''); setScreen('settings'); }} busy={working} error={error} />;
+    if (screen === 'gallery') return <GalleryScreen gallery={gallery} onBack={reset} />;
+    if (screen === 'done') return <DoneScreen hash={hash} onGallery={onGallery} onNew={reset} busy={working} error={error} />;
+    if (screen === 'uploading') return <UploadingScreen progress={progress} />;
+    if (screen === 'preview' && photo) return <PreviewScreen
+      file={fileFor(photo)}
+      captured={photo.uri} original={photo.originalUri} selectedCamera={photo.cameraId}
+      backendReady={backend} canDevelop={photo.mediaType === 'video' ? hasVideoLooks() : backend || hasOnDeviceLook('g7x')} busy={working}
+      cloudEnabled={CLOUD_FEATURES_ENABLED && photo.mediaType !== 'video'}
+      grade={developing ? { kind: 'grading' } : photo.cameraId === 'original' ? { kind: 'none' } : { kind: 'graded', name: photo.cameraName }}
+      saved={saved} error={error} notice={notice} onVibe={onVibe}
+      onRegrade={onRegrade} onClose={reset} onSave={onSave} onShare={onShare} onUpload={onUpload} onDelete={onDelete}
+    />;
+    if (!camPerm?.granted) return <PermissionScreen
+      canAskAgain={camPerm?.canAskAgain ?? true}
+      onAllow={() => { void (camPerm?.canAskAgain === false && Platform.OS !== 'web' ? Linking.openSettings() : requestCam()).catch(() => {}); }}
+      onRoll={() => setScreen('roll')}
+      onImport={onImport} busy={working} error={error}
+    />;
+    return <CameraScreen onCapture={onCapture} onCaptureVideo={onCaptureVideo} videoAvailable={hasVideoLooks()}
+      onGallery={() => setScreen('roll')} onSettings={() => { setError(''); setScreen('settings'); }}
+      lastThumb={roll[0]?.mediaType === 'video' ? roll[0].thumbnailUri ?? null : roll[0]?.uri ?? null}
+      backendReady={backend} settings={effectiveSettings} cloudEnabled={CLOUD_FEATURES_ENABLED} />;
+  };
   return <DeviceFrame>{renderScreen()}</DeviceFrame>;
 }
-

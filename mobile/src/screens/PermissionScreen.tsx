@@ -2,9 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-type Props = { onAllow: () => void };
+type Props = { onAllow: () => void; onRoll: () => void; onImport: () => void; canAskAgain: boolean; busy: boolean; error: string };
 
-export function PermissionScreen({ onAllow }: Props) {
+export function PermissionScreen({ onAllow, onRoll, onImport, canAskAgain, busy, error }: Props) {
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(20)).current;
   useEffect(() => {
@@ -19,11 +19,14 @@ export function PermissionScreen({ onAllow }: Props) {
       <Animated.View style={[s.card, { opacity: fade, transform: [{ translateY: slide }] }]}>
         <View style={s.iconWrap}><View style={s.iconCircle}><Text style={s.iconT}>◉</Text></View></View>
         <Text style={s.h}>Camera Access</Text>
-        <Text style={s.p}>VibeCam needs permission to use your camera for capturing photos and video.</Text>
-        <Pressable style={({ pressed }) => [s.btn, pressed && s.btnPressed]} onPress={onAllow}>
-          <Text style={s.btnT}>Continue</Text>
+        <Text style={s.p}>{canAskAgain ? 'Allow camera access to take photos and short videos with your favourite compact camera looks.' : 'Camera access is off. Enable it in your device or browser settings to shoot photos and videos. Your Film Roll is still available.'}</Text>
+        <Pressable accessibilityRole="button" style={({ pressed }) => [s.btn, pressed && s.btnPressed]} onPress={onAllow}>
+          <Text style={s.btnT}>{canAskAgain ? 'Allow camera' : 'Open Settings'}</Text>
         </Pressable>
-        <Text style={s.footnote}>You can change this later in Settings</Text>
+        <Pressable accessibilityRole="button" onPress={onImport} disabled={busy} style={{ padding: 16 }}><Text style={{ color: '#FFD60A' }}>Import a photo</Text></Pressable>
+        <Text style={s.footnote}>JPEG or PNG from Files</Text>
+        <Pressable accessibilityRole="button" onPress={onRoll} disabled={busy} style={{ padding: 16 }}><Text style={{ color: '#a1a1aa' }}>Open Film Roll</Text></Pressable>
+        {error ? <Text accessibilityRole="alert" style={{ color: '#ff9b9b' }}>{error}</Text> : null}
       </Animated.View>
     </View>
   );

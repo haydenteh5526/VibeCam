@@ -9,6 +9,8 @@ type Props = {
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
   onClose: () => void;
+  error?: string;
+  cloudEnabled: boolean;
 };
 
 const FRAME_OPTIONS: { value: Settings['frame']; label: string }[] = [
@@ -35,8 +37,8 @@ const CHARACTER_LEVELS: { value: number; label: string }[] = [
   { value: 1.5, label: 'Extreme' },
 ];
 
-export function SettingsScreen({ settings, onChange, onClose }: Props) {
-  const tap = () => { if (settings.haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
+export function SettingsScreen({ settings, onChange, onClose, error, cloudEnabled }: Props) {
+  const tap = () => { if (settings.haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); };
   const set = (patch: Partial<Settings>) => { tap(); onChange(patch); };
 
   const Segmented = <T,>({
@@ -46,7 +48,7 @@ export function SettingsScreen({ settings, onChange, onClose }: Props) {
       {options.map(o => {
         const active = o.value === value;
         return (
-          <Pressable key={String(o.label)} onPress={() => onSelect(o.value)} style={[s.segItem, active && s.segItemOn]}>
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} key={String(o.label)} onPress={() => onSelect(o.value)} style={[s.segItem, active && s.segItemOn]}>
             <Text style={[s.segT, active && s.segTOn]} numberOfLines={1}>{o.label}</Text>
           </Pressable>
         );
@@ -63,15 +65,16 @@ export function SettingsScreen({ settings, onChange, onClose }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
+        {error ? <Text accessibilityRole="alert" style={{ color: '#ff9b9b' }}>{error}</Text> : null}
         <Text style={s.section}>Camera</Text>
         <View style={s.card}>
           <Text style={s.label}>Default camera</Text>
           <Text style={s.hint}>Selected each time the app opens</Text>
           <View style={s.chipWrap}>
-            <Pressable onPress={() => set({ defaultCamera: 'auto' })} style={[s.chip, settings.defaultCamera === 'auto' && s.chipOn]}>
+            {cloudEnabled && <Pressable onPress={() => set({ defaultCamera: 'auto' })} style={[s.chip, settings.defaultCamera === 'auto' && s.chipOn]}>
               <View style={[s.dot, { backgroundColor: '#22c55e' }]} />
               <Text style={[s.chipT, settings.defaultCamera === 'auto' && s.chipTOn]}>Auto</Text>
-            </Pressable>
+            </Pressable>}
             {FILTERS.filter(f => f.id !== 'original').map(f => (
               <Pressable key={f.id} onPress={() => set({ defaultCamera: f.id })} style={[s.chip, settings.defaultCamera === f.id && s.chipOn]}>
                 <View style={[s.dot, { backgroundColor: f.dot }]} />
@@ -84,11 +87,12 @@ export function SettingsScreen({ settings, onChange, onClose }: Props) {
         <Text style={s.section}>Look</Text>
         <View style={s.card}>
           <Text style={s.label}>Camera character</Text>
-          <Text style={s.hint}>Grain, vignette, highlight bloom and lens softness. Off leaves colour only.</Text>
+          <Text style={s.hint}>{cloudEnabled ? 'For photos: grain, vignette, highlight bloom and lens softness. Videos use the camera colour look.' : 'For photos: grain, vignette and highlight character. Videos use the camera colour look.'}</Text>
           <Segmented options={CHARACTER_LEVELS} value={settings.characterStrength} onSelect={v => set({ characterStrength: v })} />
         </View>
 
-        <Text style={s.section}>Effects</Text>
+        {cloudEnabled && <><Text style={s.section}>Effects</Text>
+        <Text style={s.hint}>These effects need a connection. When enabled, developing uses the server; offline photos keep the camera look without effects.</Text>
         <View style={s.card}>
           <View style={s.row}>
             <View style={s.rowText}>
@@ -132,28 +136,29 @@ export function SettingsScreen({ settings, onChange, onClose }: Props) {
                 adds an adaptive colour match plus halation and lens softness.
               </Text>
             </View>
-            <Switch value={settings.onDeviceLook} onValueChange={v => set({ onDeviceLook: v })}
+            <Switch accessibilityLabel="Develop on device" value={settings.onDeviceLook} onValueChange={v => set({ onDeviceLook: v })}
               trackColor={{ true: '#FFD60A', false: '#3a3a3c' }} thumbColor="#fff" />
           </View>
         </View>
 
+        </>}
         <Text style={s.section}>Saving</Text>
         <View style={s.card}>
           <View style={s.row}>
             <View style={s.rowText}>
               <Text style={s.label}>Auto-save</Text>
-              <Text style={s.hint}>Write the developed photo to Photos automatically</Text>
+              <Text style={s.hint}>Save each photo or styled clip to Photos automatically</Text>
             </View>
-            <Switch value={settings.autoSave} onValueChange={v => set({ autoSave: v })}
+            <Switch accessibilityLabel="Auto-save to Photos" value={settings.autoSave} onValueChange={v => set({ autoSave: v })}
               trackColor={{ true: '#FFD60A', false: '#3a3a3c' }} thumbColor="#fff" />
           </View>
           <View style={s.divider} />
           <View style={s.row}>
             <View style={s.rowText}>
               <Text style={s.label}>Keep original</Text>
-              <Text style={s.hint}>Also save the untouched frame</Text>
+              <Text style={s.hint}>Also save the untouched photo or video</Text>
             </View>
-            <Switch value={settings.saveOriginal} onValueChange={v => set({ saveOriginal: v })}
+            <Switch accessibilityLabel="Keep original in Photos" value={settings.saveOriginal} onValueChange={v => set({ saveOriginal: v })}
               trackColor={{ true: '#FFD60A', false: '#3a3a3c' }} thumbColor="#fff" />
           </View>
         </View>
@@ -162,7 +167,7 @@ export function SettingsScreen({ settings, onChange, onClose }: Props) {
         <View style={s.card}>
           <View style={s.row}>
             <View style={s.rowText}><Text style={s.label}>Haptics</Text></View>
-            <Switch value={settings.haptics} onValueChange={v => onChange({ haptics: v })}
+            <Switch accessibilityLabel="Haptic feedback" value={settings.haptics} onValueChange={v => onChange({ haptics: v })}
               trackColor={{ true: '#FFD60A', false: '#3a3a3c' }} thumbColor="#fff" />
           </View>
           <View style={s.divider} />
@@ -171,14 +176,13 @@ export function SettingsScreen({ settings, onChange, onClose }: Props) {
               <Text style={s.label}>Grid</Text>
               <Text style={s.hint}>Show rule-of-thirds guides</Text>
             </View>
-            <Switch value={settings.grid} onValueChange={v => set({ grid: v })}
+            <Switch accessibilityLabel="Camera grid" value={settings.grid} onValueChange={v => set({ grid: v })}
               trackColor={{ true: '#FFD60A', false: '#3a3a3c' }} thumbColor="#fff" />
           </View>
         </View>
 
         <Text style={s.footer}>
-          Effects are applied when the photo is developed. Re-developing the same shot with the
-          same settings always produces the same result.
+          {cloudEnabled ? 'Camera looks are applied when a photo is developed.' : 'Photos are developed on your iPhone. No account or internet connection is needed.'}
         </Text>
       </ScrollView>
     </View>

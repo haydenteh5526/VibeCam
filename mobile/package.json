@@ -10,16 +10,20 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/**/*.test.ts"
+    "test": "tsx --test src/**/*.test.ts",
+    "test:gpu": "node tools/render-smoke.mjs",
+    "assets:icons": "node tools/build-icons.mjs",
+    "assets:video-luts": "node tools/build-video-luts.mjs",
+    "check:release": "npm run typecheck && npm test && expo install --check && expo export --platform all"
   },
   "dependencies": {
-    "expo": "~54.0.33",
+    "expo": "~54.0.37",
     "expo-asset": "~12.0.13",
     "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
-    "expo-dev-client": "~6.0.20",
+    "expo-dev-client": "~6.0.21",
     "expo-document-picker": "~14.0.8",
-    "expo-file-system": "~19.0.21",
+    "expo-file-system": "~19.0.24",
     "expo-gl": "~16.0.10",
     "expo-haptics": "~15.0.8",
     "expo-media-library": "~18.2.1",
@@ -36,6 +40,7 @@
   "devDependencies": {
     "@expo/ngrok": "4.1.3",
     "@types/react": "~19.1.0",
+    "sharp": "^0.35.4",
     "tsx": "4.23.1",
     "typescript": "~5.9.2"
   },

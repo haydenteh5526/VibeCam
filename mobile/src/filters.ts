@@ -3,8 +3,8 @@
 // because the selected id is sent to POST /grade via the `X-Camera` header and the
 // backend applies that camera's color science to the captured photo.
 //
-// The `style` here only drives the *live viewfinder* preview wash — a lightweight
-// approximation. The real, high-quality look is rendered server-side on capture.
+// The `style` here drives a lightweight live viewfinder wash. Offline photo rendering
+// and iPhone video export apply the camera's baked LUT to the saved media.
 
 export type FilterId = 'original' | 'g7x' | 'rx100' | 'gr' | 'x100' | 'ccd' | 'powershot';
 

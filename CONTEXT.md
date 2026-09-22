@@ -4,6 +4,15 @@
 > project up on another machine or in a new session.
 > Last updated: 2026-07-24.
 
+> **2026-09-21 update:** iPhone-first reliability work is on
+> `codex/reliable-photo-workflow`. Read `docs/RELEASE_READINESS.md` before the older
+> status notes below. Film Roll now retains images in documents (IndexedDB on web),
+> capture and edits share one persisted photo, the native renderer has been repaired,
+> and browser import/develop/re-develop/upload/reload has been exercised. Native iPhone
+> verification and signing are still outstanding. Updated checks: 62 mobile, 118 backend.
+> The agreed first release is offline-only: cloud controls and all backend requests are
+> disabled unless `EXPO_PUBLIC_ENABLE_CLOUD_FEATURES=true` is explicitly set for development.
+
 ---
 
 ## 1. What VibeCam is

@@ -37,12 +37,10 @@ uniform float uSeed;
 // Sample one blue slice of the LUT strip at (r, g). The strip is size*size wide by
 // size tall: slice b occupies x in [b/size, (b+1)/size).
 vec3 lutSlice(float b, vec2 rg) {
-  float sliceWidth = 1.0 / uLutSize;
-  // Half-texel inset stops bilinear filtering from bleeding across slice boundaries.
-  float half_ = 0.5 / (uLutSize * uLutSize);
-  float x = (b + clamp(rg.x, 0.0, 1.0)) * sliceWidth;
-  x = clamp(x, b * sliceWidth + half_, (b + 1.0) * sliceWidth - half_);
-  float y = clamp(rg.y, 0.0, 1.0);
+  // Address texel centres. Clamping slice edges alone distorts midtone interpolation.
+  float x = (b * uLutSize + clamp(rg.x, 0.0, 1.0) * (uLutSize - 1.0) + 0.5)
+    / (uLutSize * uLutSize);
+  float y = (clamp(rg.y, 0.0, 1.0) * (uLutSize - 1.0) + 0.5) / uLutSize;
   return texture2D(uLut, vec2(x, y)).rgb;
 }
 

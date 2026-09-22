@@ -164,6 +164,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["X-Grade-Preset-Id", "X-Grade-Preset-Name", "X-Grade-Method", "X-Grade-Scene"],
 )
 
 

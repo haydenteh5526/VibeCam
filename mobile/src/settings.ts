@@ -15,8 +15,10 @@ export type { Settings } from './settingsCore';
 const FILE_NAME = 'vibecam-settings.json';
 
 export async function loadSettings(): Promise<Settings> {
-  const raw = await readJson(FILE_NAME);
-  return raw === null ? DEFAULT_SETTINGS : normalize(raw);
+  try {
+    const raw = await readJson(FILE_NAME);
+    return raw === null ? DEFAULT_SETTINGS : normalize(raw);
+  } catch { return DEFAULT_SETTINGS; }
 }
 
 export async function saveSettings(s: Settings): Promise<void> {

@@ -89,6 +89,17 @@ test('normalizeRoll enforces the cap', () => {
   assert.equal(normalizeRoll(raw).length, MAX_ROLL);
 });
 
+test('normalizeRoll keeps playable video metadata and treats old entries as photos', () => {
+  const [clip, legacy] = normalizeRoll([
+    { ...entry('clip.mp4'), mediaType: 'video', thumbnailUri: 'poster.jpg', durationMs: 14_200 },
+    entry('old.jpg'),
+  ]);
+  assert.equal(clip.mediaType, 'video');
+  assert.equal(clip.thumbnailUri, 'poster.jpg');
+  assert.equal(clip.durationMs, 14_200);
+  assert.equal(legacy.mediaType, undefined);
+});
+
 test('groupByDay groups shots taken on the same day', () => {
   const day1 = new Date(2026, 0, 15, 9).getTime();
   const day1Later = new Date(2026, 0, 15, 18).getTime();
