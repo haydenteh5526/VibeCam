@@ -65,7 +65,9 @@ jobs:
       - name: Compile iOS Simulator app without signing
         working-directory: mobile/ios
         run: |
-          workspace=$(find . -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          workspaces=(./*.xcworkspace)
+          test -d "${workspaces[0]}"
+          workspace="${workspaces[0]}"
           scheme=$(basename "$workspace" .xcworkspace)
           xcodebuild -workspace "$workspace" -scheme "$scheme" \
             -configuration Debug -sdk iphonesimulator \
