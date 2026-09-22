@@ -1,11 +1,14 @@
 import { File } from 'expo-file-system';
+import { isWeb, readBytes } from './services/storage';
 import type { SelectedFile } from './types';
 
 export const resolveFileSize = async (f: SelectedFile): Promise<number> => {
   if (f.sizeBytes !== null) return f.sizeBytes;
-  const fi = new File(f.uri).info();
-  if (fi.exists && typeof fi.size === 'number' && fi.size > 0) return fi.size;
-  return new Uint8Array(await (await fetch(f.uri)).arrayBuffer()).length;
+  if (!isWeb) {
+    const fi = new File(f.uri).info();
+    if (fi.exists && typeof fi.size === 'number' && fi.size > 0) return fi.size;
+  }
+  return (await readBytes(f.uri)).length;
 };
 
 export const formatBytes = (b: number): string => {

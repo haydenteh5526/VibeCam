@@ -5,6 +5,8 @@ import { FILTERS, type FilterId } from '../filters';
 type Props = {
   active: FilterId | 'auto';
   onSelect: (id: FilterId | 'auto') => void;
+  showAuto?: boolean;
+  disabled?: boolean;
 };
 
 /**
@@ -14,7 +16,7 @@ type Props = {
  * little devices (badge, body, lens, status LED) sets the expectation of a camera look
  * instead of a filter. Drawn with views — no image assets to ship or scale.
  */
-export function CameraPicker({ active, onSelect }: Props) {
+export function CameraPicker({ active, onSelect, showAuto = true, disabled = false }: Props) {
   const cameras = FILTERS.filter(f => f.id !== 'original');
 
   return (
@@ -24,7 +26,7 @@ export function CameraPicker({ active, onSelect }: Props) {
       contentContainerStyle={s.row}
       style={s.strip}
     >
-      <Pressable onPress={() => onSelect('auto')} style={[s.card, active === 'auto' && s.cardOn]}>
+      {showAuto && <Pressable disabled={disabled} onPress={() => onSelect('auto')} style={[s.card, active === 'auto' && s.cardOn]}>
         <View style={[s.body, active === 'auto' && s.bodyOn]}>
           <View style={[s.lens, { borderColor: '#22c55e' }]}>
             <Text style={s.autoGlyph}>A</Text>
@@ -33,12 +35,12 @@ export function CameraPicker({ active, onSelect }: Props) {
         </View>
         <Text style={[s.name, active === 'auto' && s.nameOn]} numberOfLines={1}>Auto</Text>
         {active === 'auto' && <View style={[s.led, { backgroundColor: '#22c55e' }]} />}
-      </Pressable>
+      </Pressable>}
 
       {cameras.map(cam => {
         const on = active === cam.id;
         return (
-          <Pressable key={cam.id} onPress={() => onSelect(cam.id)} style={[s.card, on && s.cardOn]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={cam.name} accessibilityState={{ selected: on, disabled }} disabled={disabled} key={cam.id} onPress={() => onSelect(cam.id)} style={[s.card, on && s.cardOn]}>
             <View style={[s.body, on && s.bodyOn]}>
               <View style={[s.lens, { borderColor: cam.dot }]}>
                 <View style={[s.glass, { backgroundColor: cam.dot }]} />

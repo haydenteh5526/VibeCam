@@ -31,6 +31,12 @@ def test_health_endpoint_contract(client: TestClient) -> None:
     assert isinstance(payload["timestamp_utc"], str)
 
 
+def test_browser_can_read_developed_camera_metadata(client: TestClient) -> None:
+    response = client.get("/health", headers={"Origin": "http://localhost:8081"})
+    exposed = {value.strip().lower() for value in response.headers["access-control-expose-headers"].split(",")}
+    assert {"x-grade-preset-id", "x-grade-preset-name", "x-grade-method"} <= exposed
+
+
 def test_upload_init_and_status(client: TestClient) -> None:
     init_response = client.post(
         "/uploads/init",

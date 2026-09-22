@@ -97,12 +97,19 @@ export function normalize(raw: unknown): Settings {
  * Only non-default effects are sent, keeping requests minimal and making it obvious
  * from the headers alone what was asked for.
  */
-export function gradeHeaders(s: Settings, seed: number): Record<string, string> {
+export function gradeHeaders(s: Settings, seed: number, takenAt?: number): Record<string, string> {
   const h: Record<string, string> = {
     'X-Character': String(s.characterStrength),
     'X-Seed': String(Math.trunc(seed)),
   };
-  if (s.dateStamp) h['X-Date-Stamp'] = '1';
+  if (s.dateStamp) {
+    h['X-Date-Stamp'] = '1';
+    if (takenAt !== undefined && Number.isFinite(takenAt)) {
+      const date = new Date(takenAt);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      h['X-Date-Text'] = `'${pad(date.getFullYear() % 100)} ${pad(date.getMonth() + 1)} ${pad(date.getDate())}`;
+    }
+  }
   if (s.frame !== 'none') h['X-Frame'] = s.frame;
   if (s.lightLeak > 0) h['X-Light-Leak'] = String(s.lightLeak);
   if (s.dust > 0) h['X-Dust'] = String(s.dust);

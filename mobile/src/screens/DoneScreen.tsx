@@ -2,9 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-type Props = { hash: string | null; onGallery: () => void; onNew: () => void };
+type Props = { hash: string | null; onGallery: () => void; onNew: () => void; busy: boolean; error: string };
 
-export function DoneScreen({ hash, onGallery, onNew }: Props) {
+export function DoneScreen({ hash, onGallery, onNew, busy, error }: Props) {
   const scale = useRef(new Animated.Value(0.8)).current;
   const fade = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -19,10 +19,11 @@ export function DoneScreen({ hash, onGallery, onNew }: Props) {
       <Animated.View style={[s.card, { opacity: fade, transform: [{ scale }] }]}>
         <View style={s.check}><Text style={s.checkT}>✓</Text></View>
         <Text style={s.title}>Upload Complete</Text>
-        <Text style={s.sub}>Your file has been securely uploaded</Text>
+        <Text style={s.sub}>Your photo has been uploaded</Text>
+        {error ? <Text accessibilityRole="alert" style={{ color: '#ff9b9b', marginBottom: 12 }}>{error}</Text> : null}
         {hash && <View style={s.hashWrap}><Text style={s.hash}>{hash.slice(0, 20)}</Text></View>}
         <View style={s.row}>
-          <Pressable style={({ pressed }) => [s.btnO, pressed && s.pressed]} onPress={onGallery}><Text style={s.btnOT}>View Uploads</Text></Pressable>
+          <Pressable disabled={busy} style={({ pressed }) => [s.btnO, pressed && s.pressed]} onPress={onGallery}><Text style={s.btnOT}>View Uploads</Text></Pressable>
           <Pressable style={({ pressed }) => [s.btnS, pressed && s.pressed]} onPress={onNew}><Text style={s.btnST}>New Capture</Text></Pressable>
         </View>
       </Animated.View>

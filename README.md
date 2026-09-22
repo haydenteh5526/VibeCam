@@ -2,7 +2,7 @@
   <img src="docs/icons/icon.svg" height="80" width="80" />
   <h1>VibeCam</h1>
   <p><strong>Point-and-shoot pocket camera simulator</strong></p>
-  <p>Capture photos with the color science of iconic compact cameras — Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD digicams, and Canon PowerShot.</p>
+  <p>Take photos and short videos with six pocket digicam looks — Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD and Canon PowerShot.</p>
 
   ![License](https://img.shields.io/github/license/haydenteh5526/VibeCam)
   ![Last Commit](https://img.shields.io/github/last-commit/haydenteh5526/VibeCam)
@@ -13,15 +13,22 @@
 
 ## Features
 
-- **Pocket Camera Emulation** — Reproduces the in-camera color science of popular point-and-shoot cameras: Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100 (Classic Chrome), Y2K CCD digicam, and Canon PowerShot
-- **Camera Character** — Highlight bloom, lens vignette, corner softness, chromatic aberration and luminance-dependent sensor grain, so results read as a camera rather than a filter
-- **Point-and-shoot Effects** — LED date stamp, printed frames, light leaks, dust and scratches. Deterministic: the same shot re-develops identically
-- **On-device Developing** — Baked 3D LUTs applied on the GPU, so capture is instant and works offline
-- **Film Roll** — In-app roll of developed shots; tap any shot to re-develop it with a different camera
-- **Settings** — Default camera, character intensity, effects, auto-save, keep-original, haptics, grid
-- **Auto Camera Match** — The backend analyzes the captured pixels and picks the best-fitting camera
-- **Vibe Grading** — Optional AI color grade from a text prompt (e.g. "warm nostalgic sunset")
-- **Cross-Platform** — iOS and Android via Expo
+The first iPhone release focuses on **offline photo and video looks, photo import, Film Roll,
+Save and Share**. Cloud uploads, AI and server-only effects are hidden and all backend
+requests are disabled by default. For cloud development only, set
+`EXPO_PUBLIC_ENABLE_CLOUD_FEATURES=true` before starting Expo. EAS build profiles
+explicitly keep this disabled.
+
+- **Pocket Camera Emulation** — Six compact-camera-inspired colour looks: Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD digicam, and Canon PowerShot
+- **Photo Character** — Offline highlight, vignette and sensor grain controls; video uses the selected camera's colour look
+- **On-device Developing** — Baked 3D LUTs render photos on the GPU and video during local export
+- **Film Roll** — Photos and clips stay on the iPhone with their originals until you delete them; tap an item to try another look
+- **Durable Media** — Originals and edits survive cache eviction; preview, saving and sharing use the same committed media
+- **Photo Import** — Develop JPEG and PNG photos from Files, including when camera access is off
+- **Digicam Video** — Record up to 15 seconds with sound, apply the selected camera's colour look offline, and restyle from the original in Film Roll. Requires an iPhone preview or release build; Expo Go cannot load the local video module.
+- **Settings** — Default camera, photo character intensity, auto-save, keep-original, haptics, grid
+- **Cloud development mode** — Optional server effects, automatic camera selection and AI experiments behind an explicit developer flag
+- **Platform** — iPhone is the first release target; web supports photo workflow previews, and Android remains in development
 - **CI/CD** — GitHub Actions for backend tests, mobile unit tests and typechecks
 
 ## Tech Stack
@@ -183,12 +190,14 @@ health checks (Render) keep working.
 ```bash
 # Backend
 cd backend
-python -m pytest -q          # 117 tests
+python -m pytest -q
 
 # Mobile
 cd mobile
-npm test                     # 46 tests (tsx + node:test)
+npm test                     # tsx + node:test
 npm run typecheck
+npm run check:release         # checks and exports iOS, Android, web bundles
+npm run test:gpu              # open http://127.0.0.1:8082 and run the shader check
 ```
 
 Baked LUT assets must stay in sync with the camera parameters. After changing any
@@ -200,6 +209,9 @@ python tools/build_luts.py
 ```
 
 ## Deployment
+
+See **[release readiness and iPhone test checklist](docs/RELEASE_READINESS.md)** for
+verified behavior and the remaining steps before store submission.
 
 ### Backend (Render)
 

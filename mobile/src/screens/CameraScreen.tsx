@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LightSensor } from 'expo-sensors';
-import { CameraView, CameraType, FlashMode } from 'expo-camera';
-import { File } from 'expo-file-system';
+import { CameraView, CameraType, FlashMode, useMicrophonePermissions } from 'expo-camera';
 import { StatusBar } from 'expo-status-bar';
 import { FILTERS, type FilterId } from '../filters';
 import { CameraPicker } from '../components/CameraPicker';
-import { useLayoutWidth } from '../components/DeviceFrame';
+import { useLayoutHeight, useLayoutWidth } from '../components/DeviceFrame';
 import { getRandomPose, type PoseSuggestion } from '../poses';
 import { guideComposition } from '../services/api';
 import type { Settings } from '../settings';
@@ -44,21 +43,28 @@ function describeLenses(names: string[]): LensOption[] {
 }
 
 type Props = {
-  onCapture: (file: SelectedFile, uri: string, camera: FilterId | 'auto') => void;
+  onCapture: (file: SelectedFile, uri: string, camera: FilterId | 'auto') => void | Promise<void>;
+  onCaptureVideo: (uri: string, camera: FilterId | 'auto', durationMs: number) => void | Promise<void>;
+  videoAvailable: boolean;
   onGallery: () => void;
   onSettings: () => void;
   lastThumb: string | null;
   backendReady: boolean;
+  cloudEnabled: boolean;
   settings: Settings;
 };
 
-export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, backendReady, settings }: Props) {
+export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGallery, onSettings, lastThumb, backendReady, cloudEnabled, settings }: Props) {
   // Sized against the phone frame, not the browser window, so the 4:3 viewfinder maths
   // stay correct when the app runs on web for development.
   const W = useLayoutWidth();
-  const vfSize = { width: W - 16, height: (W - 16) * (4 / 3) };
+  const H = useLayoutHeight();
   const ovalSize = { width: W * 0.38, height: W * 0.52, borderRadius: W * 0.19 };
   const [facing, setFacing] = useState<CameraType>('back');
+  const [mode, setMode] = useState<'photo' | 'video'>('photo');
+  const [micPerm, requestMic] = useMicrophonePermissions();
+  const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
   const [flashState, setFlashState] = useState<FlashState>('auto');
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(0);
@@ -83,24 +89,41 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
   const flashOpacity = useRef(new Animated.Value(0)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
   const lastDist = useRef<number | null>(null);
+  const captureLock = useRef(false);
+  const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const aspect = mode === 'video' ? 16 / 9 : 4 / 3;
+  const chrome = 73 + 18 + 43 + (mode === 'video' ? 16 : 0) + 92 + 80
+    + (lenses.length > 1 ? 46 : 0) + (showGuide && mode === 'photo' ? 110 : 0);
+  const vfWidth = Math.min(W - 16, Math.max(160, (H - chrome - 12) / aspect));
+  const vfSize = { width: vfWidth, height: vfWidth * aspect };
+  useEffect(() => () => {
+    if (countdownTimer.current) clearInterval(countdownTimer.current);
+    if (recordTimer.current) clearInterval(recordTimer.current);
+    cam.current?.stopRecording();
+  }, []);
 
   const flashMode: FlashMode = flashState === 'auto' ? 'auto' : flashState === 'on' ? 'on' : 'off';
 
   /** Haptic feedback that respects the user's setting. */
   const buzz = useCallback(async (style: Haptics.ImpactFeedbackStyle) => {
-    if (settings.haptics) await Haptics.impactAsync(style);
+    if (settings.haptics) await Haptics.impactAsync(style).catch(() => {});
   }, [settings.haptics]);
 
   useEffect(() => { Animated.timing(fadeIn, { toValue: 1, duration: 400, useNativeDriver: true }).start(); }, [fadeIn]);
-  useEffect(() => { Animated.loop(Animated.sequence([Animated.timing(shutterGlow, { toValue: 0.5, duration: 1200, useNativeDriver: true }), Animated.timing(shutterGlow, { toValue: 0, duration: 1200, useNativeDriver: true })])).start(); }, [shutterGlow]);
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([Animated.timing(shutterGlow, { toValue: 0.5, duration: 1200, useNativeDriver: true }), Animated.timing(shutterGlow, { toValue: 0, duration: 1200, useNativeDriver: true })]));
+    loop.start(); return () => loop.stop();
+  }, [shutterGlow]);
 
   // Ambient light sensor: a genuine reading, used only as an advisory hint.
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
+    let cancelled = false;
     LightSensor.isAvailableAsync().then(available => {
-      if (available) { sub = LightSensor.addListener(({ illuminance }) => { setLowLight(illuminance < 10); }); LightSensor.setUpdateInterval(2000); }
+      if (available && !cancelled) { sub = LightSensor.addListener(({ illuminance }) => { setLowLight(illuminance < 10); }); LightSensor.setUpdateInterval(2000); }
     }).catch(() => {});
-    return () => { sub?.remove(); };
+    return () => { cancelled = true; sub?.remove(); };
   }, []);
 
   const onCameraReady = useCallback(async () => {
@@ -123,8 +146,8 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
   }, [buzz]);
 
   // Controls (each one maps to a real camera capability)
-  const cycleFlash = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setFlashState(f => f === 'auto' ? 'on' : f === 'on' ? 'off' : 'auto'); }, [buzz]);
-  const flip = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Medium); setFacing(f => f === 'back' ? 'front' : 'back'); }, [buzz]);
+  const cycleFlash = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setFlashState(f => mode === 'video' ? f === 'on' ? 'off' : 'on' : f === 'auto' ? 'on' : f === 'on' ? 'off' : 'auto'); }, [buzz, mode]);
+  const flip = useCallback(() => { if (captureLock.current || countdownTimer.current) return; buzz(Haptics.ImpactFeedbackStyle.Medium); setReady(false); setLens(undefined); setLenses([]); setZoom(0); setFacing(f => f === 'back' ? 'front' : 'back'); }, [buzz]);
   const cycleTimer = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setTimer(t => t === 0 ? 3 : t === 3 ? 10 : 0); }, [buzz]);
   const toggleGrid = useCallback(() => { buzz(Haptics.ImpactFeedbackStyle.Light); setShowGrid(g => !g); }, [buzz]);
   const toggleGuide = useCallback(() => {
@@ -166,18 +189,18 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
   const triggerFlash = useCallback(() => { setFlashAnimActive(true); flashOpacity.setValue(1); Animated.timing(flashOpacity, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => setFlashAnimActive(false)); }, [flashOpacity]);
 
   const doCapture = useCallback(async () => {
-    if (!cam.current || !ready || capturing) return;
+    if (!cam.current || !ready || captureLock.current) return;
+    captureLock.current = true;
     setCapturing(true);
     try {
       await buzz(Haptics.ImpactFeedbackStyle.Medium);
       triggerFlash();
       const p = await cam.current.takePictureAsync({ quality: 0.95 });
       if (!p?.uri) return;
-      const fi = new File(p.uri).info();
       // The graded result is what gets saved to the camera roll (see App.onCapture),
       // so nothing is written to the library here.
-      onCapture(
-        { uri: p.uri, name: `IMG_${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: fi.exists && typeof fi.size === 'number' ? fi.size : null },
+      await onCapture(
+        { uri: p.uri, name: `IMG_${Date.now()}.jpg`, mimeType: 'image/jpeg', sizeBytes: null },
         p.uri,
         activeFilter,
       );
@@ -185,22 +208,64 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
       setErr(e instanceof Error ? e.message : 'Capture failed');
       setTimeout(() => setErr(''), 2500);
     } finally {
+      captureLock.current = false;
       setCapturing(false);
     }
   }, [ready, capturing, onCapture, triggerFlash, activeFilter, buzz]);
 
+  const startRecording = useCallback(async () => {
+    if (!cam.current || !ready || captureLock.current || !videoAvailable) return;
+    captureLock.current = true;
+    const started = Date.now();
+    setRecording(true); setRecordSeconds(0); setErr(''); setShowSettings(false);
+    recordTimer.current = setInterval(() => setRecordSeconds(Math.min(15, Math.floor((Date.now() - started) / 1000))), 250);
+    try {
+      await buzz(Haptics.ImpactFeedbackStyle.Medium);
+      const clip = await cam.current.recordAsync({ maxDuration: 15 });
+      if (!clip?.uri) throw new Error('No video was recorded. Please try again.');
+      await onCaptureVideo(clip.uri, activeFilter, Math.min(15_000, Date.now() - started));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Recording failed');
+    } finally {
+      if (recordTimer.current) clearInterval(recordTimer.current);
+      recordTimer.current = null;
+      setRecording(false); captureLock.current = false;
+    }
+  }, [ready, videoAvailable, activeFilter, onCaptureVideo, buzz]);
+
+  const switchMode = useCallback(async (next: 'photo' | 'video') => {
+    if (captureLock.current || countdownTimer.current || next === mode) return;
+    if (next === 'video' && !videoAvailable) {
+      setErr('Styled video is available in the iPhone preview or release app.'); return;
+    }
+    if (next === 'video' && !micPerm?.granted) {
+      const permission = await requestMic();
+      if (!permission.granted) setErr('Microphone off. Video will record without sound.');
+      else setErr('');
+    } else setErr('');
+    setShowGuide(false); setShowSettings(false); setFlashState(next === 'video' ? 'off' : 'auto');
+    if (next === 'video' && activeFilter === 'auto') setActiveFilter('g7x');
+    setReady(false); setMode(next);
+  }, [mode, videoAvailable, micPerm?.granted, requestMic, activeFilter]);
+
   const onShutter = useCallback(() => {
+    if (mode === 'video') {
+      if (recording) cam.current?.stopRecording();
+      else void startRecording();
+      return;
+    }
+    if (captureLock.current || countdownTimer.current || !ready) return;
     if (timer === 0) { doCapture(); return; }
     setCountdown(timer);
     let t = timer;
-    const iv = setInterval(() => {
+    countdownTimer.current = setInterval(() => {
       t--;
-      if (t <= 0) { clearInterval(iv); setCountdown(null); doCapture(); } else setCountdown(t);
+      if (t <= 0) { clearInterval(countdownTimer.current!); countdownTimer.current = null; setCountdown(null); void doCapture(); } else setCountdown(t);
     }, 1000);
-  }, [timer, doCapture]);
+  }, [timer, doCapture, ready, mode, recording, startRecording]);
 
   const selectedName = activeFilter === 'auto'
-    ? 'Auto · backend picks the camera for this scene'
+    ? backendReady ? 'Auto · picks a camera for this scene' : 'Auto · G7X look while offline'
     : (FILTERS.find(f => f.id === activeFilter)?.tagline ?? '');
   // Live preview wash for the chosen camera. 'auto' stays neutral because the
   // decision is made server-side from the full-resolution pixels.
@@ -220,14 +285,14 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
 
       {/* Top bar */}
       <View style={st.topBar}>
-        <Pressable onPress={cycleFlash} style={st.topPill}>
+        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'video' ? `Video light ${flashState}` : `Flash ${flashState}`} onPress={cycleFlash} disabled={recording} style={st.topPill}>
           <View style={st.boltWrap}><View style={[st.boltTop, flashState !== 'off' && st.boltOn]} /><View style={[st.boltBot, flashState !== 'off' && st.boltOn]} /></View>
           {flashState === 'auto' && <Text style={st.trLabel}>A</Text>}
         </Pressable>
-        {!backendReady && (
-          <View style={st.offlinePill}><Text style={st.offlineT}>Offline · no camera look</Text></View>
+        {cloudEnabled && !backendReady && (
+          <View style={st.offlinePill}><Text style={st.offlineT}>{Platform.OS === 'web' ? 'Offline · original photos' : 'Offline · camera looks available'}</Text></View>
         )}
-        <Pressable onPress={() => setShowSettings(s => !s)} style={st.topPill}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Camera settings" disabled={recording} onPress={() => setShowSettings(s => !s)} style={st.topPill}>
           <View style={st.dots}><View style={st.d} /><View style={st.d} /><View style={st.d} /></View>
         </Pressable>
       </View>
@@ -235,8 +300,8 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
       {/* Quick panel — only controls that actually do something */}
       {showSettings && (
         <View style={st.setPanel}>
-          <Pressable onPress={cycleFlash} style={st.setItem}><Text style={st.setL}>Flash</Text><Text style={[st.setV, flashState !== 'off' && st.setVOn]}>{flashState === 'auto' ? 'Auto' : flashState === 'on' ? 'On' : 'Off'}</Text></Pressable>
-          <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={[st.setV, timer > 0 && st.setVOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>
+          <Pressable onPress={cycleFlash} style={st.setItem}><Text style={st.setL}>{mode === 'video' ? 'Light' : 'Flash'}</Text><Text style={[st.setV, flashState !== 'off' && st.setVOn]}>{flashState === 'auto' ? 'Auto' : flashState === 'on' ? 'On' : 'Off'}</Text></Pressable>
+          {mode === 'photo' && <Pressable onPress={cycleTimer} style={st.setItem}><Text style={st.setL}>Timer</Text><Text style={[st.setV, timer > 0 && st.setVOn]}>{timer > 0 ? `${timer}s` : 'Off'}</Text></Pressable>}
           <Pressable onPress={toggleGrid} style={st.setItem}><Text style={st.setL}>Grid</Text><Text style={[st.setV, showGrid && st.setVOn]}>{showGrid ? 'On' : 'Off'}</Text></Pressable>
           <Pressable
             onPress={() => { setShowSettings(false); onSettings(); }}
@@ -247,15 +312,15 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
         </View>
       )}
 
-      {/* Viewfinder — fixed 4:3 box so the preview frames exactly what gets captured.
-          A flex-filled box letterboxes or crops the sensor's 4:3 output, which is why
-          the framing looked wrong compared to the stock Camera app. */}
+      {/* Match the photo sensor's 4:3 frame or a portrait video's 9:16 frame.
+          Shrink the viewfinder when the controls need more vertical room. */}
       <View style={st.vfOuter}>
         <View style={[st.vfWrap, vfSize]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={resetZoom}
             onTouchMove={e => onPinch(e as unknown as { nativeEvent: { touches: Array<{ pageX: number; pageY: number }> } })} onTouchEnd={onPinchEnd}>
-            <CameraView ref={cam} style={StyleSheet.absoluteFill} facing={facing} flash={flashMode} zoom={zoom}
-              mode="picture"
+            <CameraView key={mode} ref={cam} style={StyleSheet.absoluteFill} facing={facing} flash={mode === 'video' ? 'off' : flashMode} zoom={zoom}
+              mode={mode === 'video' ? 'video' : 'picture'} mute={mode === 'video' && !micPerm?.granted}
+              enableTorch={mode === 'video' && flashState === 'on'} videoQuality="720p"
               autofocus="on"
               animateShutter={false}
               selectedLens={lens}
@@ -266,6 +331,7 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
             {lowLight && <View style={st.hintBadge} pointerEvents="none"><Text style={st.hintT}>Low light — hold steady</Text></View>}
             {zoom > 0 && <View style={st.zoomBadge} pointerEvents="none"><Text style={st.zoomT}>{`ZOOM +${Math.round(zoom * 100)}%  ·  tap to reset`}</Text></View>}
             {countdown !== null && <View style={st.countBg}><Text style={st.countN}>{countdown}</Text></View>}
+            {recording && <View style={st.recordBadge}><View style={st.recordDot} /><Text style={st.recordText}>{`REC  00:${String(recordSeconds).padStart(2, '0')} / 00:15`}</Text></View>}
             {flashAnimActive && <Animated.View style={[st.flashOver, { opacity: flashOpacity }]} pointerEvents="none" />}
           </Pressable>
         </View>
@@ -286,35 +352,43 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
       </View>
 
       {/* Pose / composition guide */}
-      {showGuide && (
+      {showGuide && mode === 'photo' && (
         <View style={st.poseCard}>
           {aiGuide ? (
             <>
               {aiGuide.instructions.map((instr, i) => <Text key={i} style={st.poseN}>{instr}</Text>)}
               {aiGuide.tip ? <Text style={st.poseI}>{aiGuide.tip}</Text> : null}
-              <Pressable onPress={requestAiGuide} disabled={!backendReady || guideLoading} style={[st.guideBtn, (!backendReady || guideLoading) && st.disabled]}>
+              {cloudEnabled && <Pressable onPress={requestAiGuide} disabled={!backendReady || guideLoading} style={[st.guideBtn, (!backendReady || guideLoading) && st.disabled]}>
                 <Text style={st.guideBtnT}>{guideLoading ? 'Analyzing…' : 'Refresh'}</Text>
-              </Pressable>
+              </Pressable>}
             </>
           ) : (
             <>
               <View style={st.poseRow}><Text style={st.poseL}>Pose</Text><Pressable onPress={nextPose}><Text style={st.poseNext}>Next</Text></Pressable></View>
               <Text style={st.poseN}>{currentPose.name}</Text>
               <Text style={st.poseI}>{currentPose.instruction}</Text>
-              <Pressable onPress={requestAiGuide} disabled={!backendReady || guideLoading} style={[st.guideBtn, (!backendReady || guideLoading) && st.disabled]}>
+              {cloudEnabled && <Pressable onPress={requestAiGuide} disabled={!backendReady || guideLoading} style={[st.guideBtn, (!backendReady || guideLoading) && st.disabled]}>
                 <Text style={st.guideBtnT}>{guideLoading ? 'Analyzing…' : backendReady ? 'AI Guide Me' : 'AI Guide (offline)'}</Text>
-              </Pressable>
+              </Pressable>}
             </>
           )}
         </View>
       )}
 
       {/* Camera strip — stylised camera bodies rather than filter chips */}
-      <CameraPicker active={activeFilter} onSelect={id => { setActiveFilter(id); buzz(Haptics.ImpactFeedbackStyle.Light); }} />
+      <CameraPicker active={activeFilter} showAuto={cloudEnabled && mode === 'photo'} disabled={recording || capturing} onSelect={id => { setActiveFilter(id); buzz(Haptics.ImpactFeedbackStyle.Light); }} />
       <Text style={st.camTag} numberOfLines={1}>{selectedName}</Text>
 
+      <View style={st.modeRow}>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'photo' }} disabled={recording || capturing}
+          onPress={() => { void switchMode('photo'); }} style={[st.modePill, mode === 'photo' && st.modePillOn]}><Text style={[st.modeText, mode === 'photo' && st.modeTextOn]}>PHOTO</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'video' }} disabled={recording || capturing}
+          onPress={() => { void switchMode('video'); }} style={[st.modePill, mode === 'video' && st.modePillOn]}><Text style={[st.modeText, mode === 'video' && st.modeTextOn]}>VIDEO</Text></Pressable>
+      </View>
+      {mode === 'video' && <Text style={st.videoHint}>15-second clips · {micPerm?.granted ? 'sound on' : 'silent'} · look applied after recording</Text>}
+
       {/* Which effects are armed — otherwise settings are invisible until after the shot */}
-      {activeEffects.length > 0 && (
+      {mode === 'photo' && activeEffects.length > 0 && (
         <View style={st.fxRow}>
           {activeEffects.map(tag => (
             <View key={tag} style={st.fxTag}><Text style={st.fxTagT}>{tag}</Text></View>
@@ -324,19 +398,21 @@ export function CameraScreen({ onCapture, onGallery, onSettings, lastThumb, back
 
       {/* Shutter */}
       <View style={st.shutterArea}>
-        <Pressable onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready || capturing}>
+        <Pressable accessibilityRole="button" accessibilityLabel={mode === 'video' ? recording ? 'Stop recording' : 'Record video' : 'Take photo'}
+          onPress={onShutter} onPressIn={onPressIn} onPressOut={onPressOut} disabled={!ready || capturing || countdown !== null}>
           <Animated.View style={[st.shutterGlow, { opacity: shutterGlow }]} />
-          <Animated.View style={[st.shOuter, { transform: [{ scale: shutterAnim }] }]}><View style={st.shInner} /></Animated.View>
+          <Animated.View style={[st.shOuter, { transform: [{ scale: shutterAnim }] }]}><View style={[st.shInner, mode === 'video' && st.videoShutter, recording && st.videoShutterRecording]} /></Animated.View>
         </Pressable>
       </View>
 
       {/* Bottom row: gallery thumb + guide toggle + flip */}
       <View style={st.botRow}>
-        <Pressable onPress={onGallery} style={st.thumb}>{lastThumb ? <Image source={{ uri: lastThumb }} style={st.thumbImg} /> : <View style={st.thumbPh} />}</Pressable>
-        <Pressable onPress={toggleGuide} style={[st.guideToggle, showGuide && st.guideToggleOn]}>
-          <Text style={[st.guideToggleT, showGuide && st.guideToggleTOn]}>GUIDE</Text>
-        </Pressable>
-        <Pressable onPress={flip} style={st.flipBtn}><View style={st.flipCircle}><View style={st.flipArrow1} /><View style={st.flipArrow2} /></View></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open Film Roll" onPress={onGallery} disabled={recording} style={st.thumb}>{lastThumb ? <Image source={{ uri: lastThumb }} style={st.thumbImg} /> : <View style={st.thumbPh} />}</Pressable>
+        {mode === 'video' ? <View style={st.guideToggle}><Text style={st.guideToggleT}>15 SEC</Text></View> :
+          <Pressable onPress={toggleGuide} disabled={capturing} style={[st.guideToggle, showGuide && st.guideToggleOn]}>
+            <Text style={[st.guideToggleT, showGuide && st.guideToggleTOn]}>GUIDE</Text>
+          </Pressable>}
+        <Pressable accessibilityRole="button" accessibilityLabel="Switch camera" onPress={flip} style={st.flipBtn}><View style={st.flipCircle}><View style={st.flipArrow1} /><View style={st.flipArrow2} /></View></Pressable>
       </View>
 
       {err.length > 0 && <View style={st.toast}><Text style={st.toastT}>{err}</Text></View>}
@@ -384,6 +460,9 @@ const st = StyleSheet.create({
   lensTOn: { color: '#FFD60A', fontSize: 12 },
   hintBadge: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   hintT: { color: '#FFD60A', fontSize: 10, fontWeight: '600' },
+  recordBadge: { position: 'absolute', top: 10, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.75)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  recordDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff4d55' },
+  recordText: { color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
   zoomBadge: { position: 'absolute', bottom: 14, alignSelf: 'center', backgroundColor: 'rgba(28,28,30,0.8)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   zoomT: { color: '#FFD60A', fontSize: 10, fontWeight: '700' },
   countBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
@@ -403,12 +482,20 @@ const st = StyleSheet.create({
 
   // Camera picker caption (picker itself lives in components/CameraPicker)
   camTag: { color: '#8e8e93', fontSize: 10, textAlign: 'center', marginTop: 4, paddingHorizontal: 16 },
+  modeRow: { flexDirection: 'row', alignSelf: 'center', gap: 4, marginTop: 8, padding: 3, borderRadius: 16, backgroundColor: '#1c1c1e' },
+  modePill: { paddingHorizontal: 22, paddingVertical: 8, borderRadius: 13 },
+  modePillOn: { backgroundColor: '#363638' },
+  modeText: { color: '#77777b', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  modeTextOn: { color: '#FFD60A' },
+  videoHint: { color: '#8e8e93', fontSize: 10, textAlign: 'center', marginTop: 4 },
 
   // Shutter area
   shutterArea: { alignItems: 'center', paddingVertical: 10 },
   shutterGlow: { position: 'absolute', width: 82, height: 82, borderRadius: 41, backgroundColor: 'rgba(255,255,255,0.12)', top: -5, left: -5 },
   shOuter: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
   shInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff' },
+  videoShutter: { backgroundColor: '#ff4d55' },
+  videoShutterRecording: { width: 26, height: 26, borderRadius: 5 },
 
   // Bottom row
   botRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, paddingBottom: 36 },
@@ -426,4 +513,3 @@ const st = StyleSheet.create({
   toast: { position: 'absolute', top: 110, left: 16, right: 16, backgroundColor: 'rgba(239,68,68,0.9)', borderRadius: 10, padding: 10 },
   toastT: { color: '#fff', fontSize: 12, textAlign: 'center' },
 });
-
