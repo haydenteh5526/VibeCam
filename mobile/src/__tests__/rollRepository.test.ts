@@ -106,3 +106,32 @@ test('a styled clip, original and poster survive restart and are removed togethe
   assert.ok(!f.files.has(entry.originalUri!));
   assert.ok(!f.files.has(entry.thumbnailUri!));
 });
+
+test('favourites, save status and recipes survive restart without copying or deleting media', async () => {
+  const f = fixture();
+  const { entry } = await f.repo.put(shot());
+  const recipe = { amount: .8, exposure: .5, warmth: -.2, character: .75, dateStamp: true };
+  await f.repo.put({ ...entry, favorite: true, savedToLibrary: true, recipe }, entry.uri);
+  const [reopened] = await createRollRepository(f.storage).load();
+  assert.deepEqual([reopened.favorite, reopened.savedToLibrary, reopened.recipe], [true, true, recipe]);
+  assert.equal(reopened.uri, entry.uri);
+  assert.equal(reopened.originalUri, entry.originalUri);
+  assert.deepEqual(f.removed, []);
+});
+
+test('bulk deletion is atomic and leaves shared originals until the last photo is removed', async () => {
+  const f = fixture();
+  const a = await f.repo.put(shot());
+  const b = await f.repo.put(shot('cache/edit'));
+  f.fail(true);
+  await assert.rejects(f.repo.removeMany([a.entry.uri, b.entry.uri]), /Disk full/);
+  assert.equal(f.disk().length, 2);
+  assert.deepEqual(f.removed, []);
+  f.fail(false);
+  await f.repo.removeMany([a.entry.uri, a.entry.uri, 'missing']);
+  assert.ok(f.files.has(b.entry.originalUri!));
+  assert.equal(f.disk().length, 1);
+  await f.repo.removeMany([b.entry.uri]);
+  assert.equal(f.disk().length, 0);
+  assert.ok(!f.files.has(b.entry.originalUri!));
+});

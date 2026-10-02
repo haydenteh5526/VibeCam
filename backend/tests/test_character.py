@@ -165,3 +165,21 @@ def test_strength_scales_the_effect():
     weak = np.asarray(character.apply_character(src, "ccd", strength=0.25), dtype=np.float64).std()
     full = np.asarray(character.apply_character(src, "ccd", strength=1.0), dtype=np.float64).std()
     assert weak < full
+
+
+def test_highlight_shoulder_never_brightens_or_reverses_a_ramp():
+    ramp = np.repeat(np.arange(256, dtype=np.float32)[None, :, None], 3, axis=2)
+    for amount in (0, 0.1, 0.5, 1.0):
+        result = character._highlight_rolloff(ramp, amount)
+        assert np.all(result <= ramp + 1e-4)
+        assert np.all(np.diff(result[0, :, 0]) >= 0)
+        np.testing.assert_allclose(result[:, :154], ramp[:, :154], atol=1e-4)
+        assert np.max(np.diff(result[0, :, 0])) <= 1.001
+
+
+def test_highlight_shoulder_preserves_rgb_ratios():
+    colours = np.array([[[250., 220., 190.], [200., 245., 180.]]], dtype=np.float32)
+    result = character._highlight_rolloff(colours, .7)
+    ratios = result / colours
+    np.testing.assert_allclose(ratios[:, :, 0], ratios[:, :, 1], atol=1e-6)
+    np.testing.assert_allclose(ratios[:, :, 1], ratios[:, :, 2], atol=1e-6)

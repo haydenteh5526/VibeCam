@@ -113,10 +113,13 @@ def _highlight_rolloff(arr: np.ndarray, amount: float) -> np.ndarray:
         return arr
     x = arr / 255.0
     knee = 0.6
-    over = np.clip((x - knee) / (1.0 - knee), 0.0, 1.0)
-    # Soft shoulder: pull compressed highlights toward the knee.
-    compressed = knee + (1.0 - knee) * (1.0 - (1.0 - over) ** (1.0 + 2.2 * amount))
-    out = np.where(x > knee, knee + (compressed - knee), x)
+    lum = 0.2126 * x[:, :, 0] + 0.7152 * x[:, :, 1] + 0.0722 * x[:, :, 2]
+    over = np.maximum(lum - knee, 0.0)
+    compressed = knee + over / (1.0 + amount * over / (1.0 - knee))
+    # Scale luminance uniformly across RGB: compression must not brighten highlights
+    # or introduce a hue shift by applying different shoulders to each channel.
+    scale = np.where(lum > knee, compressed / np.maximum(lum, 1e-6), 1.0)
+    out = x * scale[:, :, None]
     return (out * 255.0).astype(np.float32)
 
 

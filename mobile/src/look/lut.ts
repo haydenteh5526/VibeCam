@@ -18,8 +18,8 @@ export type Rgb = [number, number, number];
 /**
  * Decode a LUT strip image into a grid.
  *
- * Strip layout is (size*size) x size: `size` blue slices laid left to right, each a
- * size x size tile of red (x) by green (y).
+ * Strip layout is (size*size) x size in .cube order: red varies within each
+ * horizontal group, green chooses the group, blue chooses the row.
  */
 export function gridFromStrip(pixels: Uint8Array, width: number, height: number): LutGrid {
   const size = height;

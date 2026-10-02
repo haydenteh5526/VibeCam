@@ -27,18 +27,19 @@ const isWeb = Platform.OS === 'web';
  */
 export function useLayoutWidth(): number {
   const { width } = useWindowDimensions();
-  return isWeb ? Math.min(width, PHONE_WIDTH) : width;
+  return isWeb && width > 480 ? PHONE_WIDTH : width;
 }
 
 export function useLayoutHeight(): number {
-  const { height } = useWindowDimensions();
-  return isWeb ? Math.min(PHONE_HEIGHT, Math.max(480, height - 48)) : height;
+  const { height, width } = useWindowDimensions();
+  return isWeb && width > 480 ? Math.min(PHONE_HEIGHT, Math.max(480, height - 48)) : height;
 }
 
 export function DeviceFrame({ children }: { children: React.ReactNode }) {
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
   if (!isWeb) return <>{children}</>;
+  if (windowWidth <= 480) return <View style={{ flex: 1, backgroundColor: '#10110f' }}>{children}</View>;
 
   // Leave a little breathing room, and never exceed the real device height.
   const frameHeight = Math.min(PHONE_HEIGHT, Math.max(480, windowHeight - 48));

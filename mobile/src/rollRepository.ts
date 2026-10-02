@@ -32,7 +32,7 @@ export function createRollRepository(storage: Storage) {
     };
     try {
       const stable: RollEntry[] = [];
-      for (const entry of next) {
+      for (const entry of normalizeRoll(next)) {
         stable.push({ ...entry, uri: await retain(entry.uri), originalUri: entry.originalUri ? await retain(entry.originalUri) : null,
           thumbnailUri: entry.thumbnailUri ? await retain(entry.thumbnailUri) : null });
       }
@@ -69,5 +69,9 @@ export function createRollRepository(storage: Storage) {
       return { roll: next, entry: next[index >= 0 ? index : 0] };
     }),
     remove: (uri: string) => serial(async () => persist(removeEntry(await load(), uri))),
+    removeMany: (uris: string[]) => serial(async () => {
+      const selected = new Set(uris);
+      return persist((await load()).filter(entry => !selected.has(entry.uri)));
+    }),
   };
 }

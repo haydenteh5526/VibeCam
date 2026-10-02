@@ -1,6 +1,7 @@
 import type { ExpoWebGLRenderingContext } from 'expo-gl';
 import { characterFor } from './characterParams';
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader';
+import { normalizeRecipe, type PhotoRecipe } from '../photoRecipe';
 
 export const LUT_SIZE = 17;
 
@@ -34,7 +35,8 @@ function buildProgram(gl: ExpoWebGLRenderingContext): WebGLProgram {
   return program;
 }
 
-async function loadTexture(gl: ExpoWebGLRenderingContext, asset: { localUri: string | null }, smooth: boolean): Promise<WebGLTexture> {
+type TextureSource = { localUri: string | null } | TexImageSource;
+async function loadTexture(gl: ExpoWebGLRenderingContext, asset: TextureSource, smooth: boolean): Promise<WebGLTexture> {
   const texture = gl.createTexture();
   if (!texture) throw new Error('could not create texture');
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -53,8 +55,8 @@ async function loadTexture(gl: ExpoWebGLRenderingContext, asset: { localUri: str
 }
 
 export async function renderToFramebuffer(
-  gl: ExpoWebGLRenderingContext, photo: { localUri: string | null }, lutAsset: { localUri: string | null },
-  width: number, height: number, opts: { camera: string; characterStrength: number; seed: number },
+  gl: ExpoWebGLRenderingContext, photo: TextureSource, lutAsset: TextureSource,
+  width: number, height: number, opts: { camera: string; characterStrength: number; seed: number; recipe?: PhotoRecipe; takenAt?: number },
 ): Promise<WebGLFramebuffer> {
   const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
   if (!width || !height || width > max || height > max) throw new Error('Photo exceeds this device GPU limit');
@@ -80,8 +82,7 @@ export async function renderToFramebuffer(
   gl.enableVertexAttribArray(aTexCoord);
   gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, stride, 2 * 4);
 
-  // The photo is filtered smoothly; the LUT uses LINEAR too, so red/green
-  // interpolation comes free from the sampler (blue is blended in the shader).
+  // LINEAR filtering handles red/blue; green slices are blended in the shader.
   const imageTex = await loadTexture(gl, photo, true);
   const lutTex = await loadTexture(gl, lutAsset, true);
 
@@ -92,10 +93,18 @@ export async function renderToFramebuffer(
   gl.bindTexture(gl.TEXTURE_2D, lutTex);
   gl.uniform1i(gl.getUniformLocation(program, 'uLut'), 1);
 
-  const p = characterFor(opts.camera, opts.characterStrength);
+  const recipe = normalizeRecipe(opts.recipe ?? { character: opts.characterStrength });
+  const p = characterFor(opts.camera, recipe.character * recipe.amount);
   const set = (name: string, value: number) =>
     gl.uniform1f(gl.getUniformLocation(program, name), value);
   set('uLutSize', LUT_SIZE);
+  set('uAmount', recipe.amount);
+  set('uExposure', recipe.exposure);
+  set('uWarmth', recipe.warmth);
+  gl.uniform2f(gl.getUniformLocation(program, 'uImageSize'), width, height);
+  const date = new Date(opts.takenAt ?? 0);
+  set('uDateStamp', recipe.dateStamp && !!opts.takenAt ? 1 : 0);
+  gl.uniform3f(gl.getUniformLocation(program, 'uDate'), date.getFullYear() % 100, date.getMonth() + 1, date.getDate());
   set('uHighlightRolloff', p.highlightRolloff);
   set('uVignette', p.vignette);
   set('uGrainShadow', p.grainShadow);
