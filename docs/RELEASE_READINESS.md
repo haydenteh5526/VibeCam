@@ -42,8 +42,8 @@ This is a tested development foundation, not yet a device-verified App Store bin
 - Browser walkthrough at 428x926 and 375x667: JPEG import, camera changes, adjustments,
   stamp, compare, favourites, reload persistence, settings return, filtering and
   confirmed deletion. Fake browser camera capture and timer cancellation pass.
-- Browser automation reported download cancellation; download initiation and retry
-  controls were exercised, but a completed browser download is not yet verified.
+- Browser downloads complete when the automation browser has an explicit download
+  directory. The downloaded JPEG was opened and visually verified; retry also works.
 - Earlier PR #26 compiled successfully in GitHub's macOS iOS Simulator job.
   Native camera, Photos, orientation, video/audio export and sharing still require hardware.
 

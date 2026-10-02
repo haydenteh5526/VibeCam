@@ -56,7 +56,7 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
       <View style={[s.media, { height: Math.min((width - 32) * 4 / 3, height * .46) }]}>
         {video && (showOriginal ? original : captured) ? <VideoPreview uri={(showOriginal ? original : captured)!} /> :
-          captured ? <Image accessibilityLabel={showOriginal ? 'Original photo' : look.name + ' developed photo'} source={{ uri: (showOriginal ? original : captured)! }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
+          captured ? <Image accessibilityRole="image" accessibilityLabel={showOriginal ? 'Original photo' : look.name + ' developed photo'} source={{ uri: (showOriginal ? original : captured)! }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
         {grade.kind === 'grading' && <DevelopingOverlay label={video ? 'Developing your clip' : 'Developing your photo'} />}
         {showOriginal && <View style={s.originalBadge}><Text style={s.originalText}>ORIGINAL</Text></View>}
       </View>

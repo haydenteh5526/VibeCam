@@ -10,7 +10,7 @@ export const theme = {
 };
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export const Icon = ({ name, size = 22, color = theme.text }: { name: IconName; size?: number; color?: string }) =>
-  <Ionicons name={name} size={size} color={color} accessible={false} />;
+  <Ionicons name={name} size={size} color={color} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden />;
 
 export function useScreenInsets() {
   const insets = useSafeAreaInsets();
@@ -29,7 +29,7 @@ export function Button({ label, onPress, icon, primary, disabled, danger, style 
   label: string; onPress: () => void; icon?: IconName; primary?: boolean; disabled?: boolean; danger?: boolean; style?: StyleProp<ViewStyle>;
 }) {
   const color = primary ? theme.bg : danger ? theme.danger : theme.text;
-  return <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }}
+  return <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled }}
     style={({ pressed }) => [ui.button, primary && { backgroundColor: theme.accent, borderColor: theme.accent }, pressed && ui.pressed, disabled && ui.disabled, style]}>
     {icon ? <Icon name={icon} size={19} color={color} /> : null}<Text style={[ui.buttonText, { color }]}>{label}</Text>
   </Pressable>;
