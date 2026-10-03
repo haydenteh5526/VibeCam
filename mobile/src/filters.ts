@@ -1,30 +1,16 @@
-// Point-and-shoot pocket camera emulations.
-// `FilterId` values MUST match the backend camera ids (see backend/grading.py CAMERAS),
-// because the selected id is sent to POST /grade via the `X-Camera` header and the
-// backend applies that camera's color science to the captured photo.
-//
-// The `style` here drives a lightweight live viewfinder wash. Offline photo rendering
-// and iPhone video export apply the camera's baked LUT to the saved media.
-
+/** Inspired looks, not measured reproductions of a camera's complete imaging pipeline. */
 export type FilterId = 'original' | 'g7x' | 'rx100' | 'gr' | 'x100' | 'ccd' | 'powershot';
-
 export type FilterPreset = {
-  id: FilterId;
-  name: string;      // short label shown on the chip
-  tagline: string;   // one-line description of the camera's look
-  dot: string;       // chip indicator color
-  style: {
-    overlayColor?: string;
-    overlayOpacity?: number;
-  };
+  id: FilterId; name: string; fullName: string; tagline: string; dot: string;
+  description: string; bestFor: string; body: string;
 };
-
 export const FILTERS: FilterPreset[] = [
-  { id: 'original', name: 'Original', tagline: 'No processing', dot: '#8e8e93', style: {} },
-  { id: 'g7x', name: 'G7X III', tagline: 'Canon warmth · punchy skin tones', dot: '#ff9e3d', style: { overlayColor: '#ff9e3d', overlayOpacity: 0.06 } },
-  { id: 'rx100', name: 'RX100', tagline: 'Sony crisp · true-to-life', dot: '#5b8cff', style: { overlayColor: '#5b8cff', overlayOpacity: 0.03 } },
-  { id: 'gr', name: 'Ricoh GR', tagline: 'High-contrast street · deep blacks', dot: '#c9ccd1', style: { overlayColor: '#15181d', overlayOpacity: 0.07 } },
-  { id: 'x100', name: 'X100', tagline: 'Classic Chrome · muted film', dot: '#b09a6a', style: { overlayColor: '#8a7d5a', overlayOpacity: 0.08 } },
-  { id: 'ccd', name: 'CCD', tagline: 'Y2K digicam · nostalgic flash', dot: '#38d6b0', style: { overlayColor: '#2fbfa6', overlayOpacity: 0.05 } },
-  { id: 'powershot', name: 'PowerShot', tagline: 'Retro Canon · party flash', dot: '#ffb84d', style: { overlayColor: '#ffb84d', overlayOpacity: 0.07 } },
+  { id: 'original', name: 'Original', fullName: 'Your iPhone', tagline: 'Untouched', dot: '#aeb4a6', body: '#70766b', description: 'The original capture, with no VibeCam processing.', bestFor: 'A clean starting point' },
+  { id: 'g7x', name: 'G7X III', fullName: 'Canon G7X III inspired', tagline: 'Warm & luminous', dot: '#efb764', body: '#38342d', description: 'Warm colour, lively reds and gentle texture. An everyday pocket-camera look.', bestFor: 'People · golden hour · everyday' },
+  { id: 'rx100', name: 'RX100', fullName: 'Sony RX100 inspired', tagline: 'Clean & crisp', dot: '#a9bdd0', body: '#32383d', description: 'Cooler colour, clear contrast and the lightest texture in the collection.', bestFor: 'Travel · daylight · architecture' },
+  { id: 'gr', name: 'GR III', fullName: 'Ricoh GR III inspired', tagline: 'Deep & contrasty', dot: '#c2c6b9', body: '#30352e', description: 'Deep blacks and restrained colour, with a little extra bite for the street.', bestFor: 'Street · shadows · city walks' },
+  { id: 'x100', name: 'X100', fullName: 'Fujifilm X100 inspired', tagline: 'Soft & understated', dot: '#bfbea0', body: '#777d6f', description: 'Muted colour and lifted shadows with a gentle highlight shoulder.', bestFor: 'Quiet moments · daylight · portraits' },
+  { id: 'ccd', name: 'CCD 2004', fullName: 'Early digital compact inspired', tagline: 'Grainy & nostalgic', dot: '#abd1b9', body: '#8a9891', description: 'A lo-fi digital look: visible texture, cooler shadows and stronger corner falloff.', bestFor: 'Night out · close flash · nostalgia' },
+  { id: 'powershot', name: 'PowerShot', fullName: 'Canon compact inspired', tagline: 'Golden & playful', dot: '#dea680', body: '#777269', description: 'Golden warmth, lively colour and small-camera texture for spontaneous moments.', bestFor: 'Friends · parties · direct flash' },
 ];
+export const getLook = (id: string) => FILTERS.find(f => f.id === id) ?? FILTERS[1];

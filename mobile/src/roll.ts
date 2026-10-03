@@ -1,3 +1,5 @@
+import { normalizeRecipe, type PhotoRecipe } from './photoRecipe';
+
 /**
  * Film roll: the app's own record of developed shots.
  *
@@ -24,6 +26,9 @@ export type RollEntry = {
   /** First frame for a video tile. */
   thumbnailUri?: string | null;
   durationMs?: number;
+  favorite?: boolean;
+  savedToLibrary?: boolean;
+  recipe?: PhotoRecipe;
 };
 
 export function addEntry(roll: RollEntry[], entry: RollEntry): RollEntry[] {
@@ -56,6 +61,9 @@ export function normalizeRoll(raw: unknown): RollEntry[] {
       cameraName: typeof r.cameraName === 'string' ? r.cameraName : 'Unknown',
       takenAt: typeof r.takenAt === 'number' && Number.isFinite(r.takenAt) ? r.takenAt : 0,
       seed: typeof r.seed === 'number' && Number.isFinite(r.seed) ? Math.trunc(r.seed) : 0,
+      favorite: r.favorite === true,
+      savedToLibrary: r.savedToLibrary === true,
+      ...(r.recipe && typeof r.recipe === 'object' ? { recipe: normalizeRecipe(r.recipe) } : {}),
       ...(r.mediaType === 'video' ? { mediaType: 'video' as const } : {}),
       thumbnailUri: typeof r.thumbnailUri === 'string' && r.thumbnailUri.length > 0 ? r.thumbnailUri : null,
       ...(r.mediaType === 'video' ? { durationMs: typeof r.durationMs === 'number' && Number.isFinite(r.durationMs) && r.durationMs >= 0 ? r.durationMs : 0 } : {}),

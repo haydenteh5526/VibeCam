@@ -1,5 +1,8 @@
 # VibeCam Project Context
 
+> Historical engineering log. For current branch state, offline scope and verification,
+> read ../CONTEXT.md and RELEASE_READINESS.md (updated 2026-10-02).
+
 Last updated: 2026-05-05
 
 ## Current State

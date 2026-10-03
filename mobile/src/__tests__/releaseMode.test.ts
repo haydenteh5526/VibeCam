@@ -13,7 +13,7 @@ test('old settings cannot enable cloud processing in the offline release', () =>
   const effective = settingsForReleaseMode(stored, false);
   assert.equal(effective.defaultCamera, 'g7x');
   assert.equal(effective.onDeviceLook, true);
-  assert.deepEqual([effective.dateStamp, effective.frame, effective.dust, effective.lightLeak], [false, 'none', 0, 0]);
+  assert.deepEqual([effective.dateStamp, effective.frame, effective.dust, effective.lightLeak], [true, 'none', 0, 0]);
   assert.equal(stored.dateStamp, true);
   assert.equal(settingsForReleaseMode(stored, true), stored);
 });

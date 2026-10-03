@@ -3,6 +3,7 @@ import { GLView } from 'expo-gl';
 import { Image, Platform } from 'react-native';
 
 import { renderToFramebuffer } from './renderFrame';
+import type { PhotoRecipe } from '../photoRecipe';
 
 /**
  * On-device look rendering.
@@ -33,7 +34,7 @@ const LUT_MODULES: Record<string, number> = {
 export { LUT_SIZE } from './renderFrame';
 
 export function hasOnDeviceLook(camera: string): boolean {
-  return Platform.OS !== 'web' && Object.hasOwn(LUT_MODULES, camera);
+  return Object.hasOwn(LUT_MODULES, camera);
 }
 
 export type DevelopOptions = {
@@ -41,6 +42,8 @@ export type DevelopOptions = {
   camera: string;
   characterStrength: number;
   seed: number;
+  recipe?: PhotoRecipe;
+  takenAt?: number;
 };
 
 /**
@@ -49,7 +52,11 @@ export type DevelopOptions = {
  */
 export async function developOnDevice(opts: DevelopOptions): Promise<string | null> {
   const module = LUT_MODULES[opts.camera];
-  if (Platform.OS === 'web' || module === undefined) return null;
+  if (module === undefined) return null;
+  if (Platform.OS === 'web') {
+    const { developWeb } = await import('./renderWeb');
+    return developWeb(opts, Asset.fromModule(module).uri);
+  }
 
   const [photo, lutAsset] = await Promise.all([
     Asset.fromURI(opts.uri).downloadAsync(),

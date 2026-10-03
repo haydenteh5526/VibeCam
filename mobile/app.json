@@ -61,9 +61,13 @@
           "photosPermission": "Allow VibeCam to save photos and videos you capture in the app.",
           "savePhotosPermission": "Allow VibeCam to save styled photos and videos to your photo library.",
           "isAccessMediaLocationEnabled": false,
-          "granularPermissions": ["photo", "video"]
+          "granularPermissions": [
+            "photo",
+            "video"
+          ]
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

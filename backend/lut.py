@@ -134,9 +134,9 @@ def bake_camera_lut(camera: str, size: int = DEFAULT_SIZE) -> np.ndarray:
 def write_png_strip(path: Path, grid: np.ndarray, size: int) -> None:
     """Write the LUT as a PNG strip for upload as a GPU texture.
 
-    Layout is (size*size) x size: each of the `size` blue slices is a size x size tile of
-    red (x) by green (y), laid out left to right. This is the conventional LUT-strip
-    format shaders expect, and a 17-point table is only 289x17 pixels — a few kilobytes,
+    Layout is (size*size) x size in flat .cube order: red varies within a horizontal
+    group, green chooses the group, blue chooses the row. This is NOT the conventional
+    blue-tile strip layout. A 17-point table is only 289x17 pixels — a few kilobytes,
     versus ~130 KB for the equivalent .cube text.
     """
     path.parent.mkdir(parents=True, exist_ok=True)

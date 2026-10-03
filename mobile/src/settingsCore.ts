@@ -39,7 +39,7 @@ export type Settings = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  defaultCamera: 'auto',
+  defaultCamera: 'g7x',
   characterStrength: 1,
   dateStamp: false,
   frame: 'none',
@@ -49,7 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   saveOriginal: false,
   haptics: true,
   grid: false,
-  onDeviceLook: false,
+  onDeviceLook: true,
 };
 
 const FRAMES: Settings['frame'][] = ['none', 'white', 'black', 'print'];

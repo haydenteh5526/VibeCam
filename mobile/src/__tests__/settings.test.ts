@@ -70,7 +70,7 @@ test('normalize accepts valid values unchanged', () => {
 });
 
 test('normalize rejects unknown camera ids and frame styles', () => {
-  assert.equal(normalize({ defaultCamera: 'leica_m11' }).defaultCamera, 'auto');
+  assert.equal(normalize({ defaultCamera: 'leica_m11' }).defaultCamera, 'g7x');
   assert.equal(normalize({ frame: 'polaroid' }).frame, 'none');
 });
 
@@ -81,9 +81,10 @@ test('normalize accepts every real camera id', () => {
 });
 
 test('normalize handles the on-device look flag', () => {
-  assert.equal(normalize({}).onDeviceLook, false);
+  assert.equal(normalize({}).onDeviceLook, true);
   assert.equal(normalize({ onDeviceLook: true }).onDeviceLook, true);
-  assert.equal(normalize({ onDeviceLook: 'yes' }).onDeviceLook, false);
+  assert.equal(normalize({ onDeviceLook: false }).onDeviceLook, false);
+  assert.equal(normalize({ onDeviceLook: 'yes' }).onDeviceLook, true);
 });
 
 test('gradeHeaders always sends character strength and seed', () => {

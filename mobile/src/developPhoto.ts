@@ -13,7 +13,7 @@ export async function developPhoto(
   settings: Settings, backendReady: boolean, engines: Engines,
 ): Promise<DevelopedPhoto> {
   if (camera === 'original') return { uri, id: camera, name: 'Original' };
-  const effects = settings.dateStamp || settings.frame !== 'none' || settings.lightLeak > 0 || settings.dust > 0;
+  const effects = settings.frame !== 'none' || settings.lightLeak > 0 || settings.dust > 0;
   const localCamera = camera === 'auto' ? 'g7x' : camera;
   const local = async (): Promise<DevelopedPhoto | null> => {
     const output = await engines.local(uri, localCamera, settings.characterStrength, seed);
@@ -21,7 +21,7 @@ export async function developPhoto(
     return {
       uri: output, id: localCamera,
       name: FILTERS.find(f => f.id === localCamera)?.name ?? localCamera,
-      notice: effects ? 'Camera look applied. Date, frame, light leak and dust effects need a connection; they were not applied.' : undefined,
+      notice: effects ? 'Camera look applied. Frame, light leak and dust effects need a connection; they were not applied.' : undefined,
     };
   };
   const remote = async () => engines.remote(uri, camera, gradeHeaders(settings, seed, takenAt));

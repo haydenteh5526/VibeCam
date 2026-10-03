@@ -1,47 +1,36 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-
+import React from 'react';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CameraBody } from '../components/CameraPicker';
+import { Button, Notice, theme, ui, useScreenInsets } from '../components/ui';
 type Props = { onAllow: () => void; onRoll: () => void; onImport: () => void; canAskAgain: boolean; busy: boolean; error: string };
-
 export function PermissionScreen({ onAllow, onRoll, onImport, canAskAgain, busy, error }: Props) {
-  const fade = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(20)).current;
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(slide, { toValue: 0, duration: 500, useNativeDriver: true }),
-    ]).start();
-  }, [fade, slide]);
-
-  return (
-    <View style={s.bg}><StatusBar style="light" />
-      <Animated.View style={[s.card, { opacity: fade, transform: [{ translateY: slide }] }]}>
-        <View style={s.iconWrap}><View style={s.iconCircle}><Text style={s.iconT}>◉</Text></View></View>
-        <Text style={s.h}>Camera Access</Text>
-        <Text style={s.p}>{canAskAgain ? 'Allow camera access to take photos and short videos with your favourite compact camera looks.' : 'Camera access is off. Enable it in your device or browser settings to shoot photos and videos. Your Film Roll is still available.'}</Text>
-        <Pressable accessibilityRole="button" style={({ pressed }) => [s.btn, pressed && s.btnPressed]} onPress={onAllow}>
-          <Text style={s.btnT}>{canAskAgain ? 'Allow camera' : 'Open Settings'}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={onImport} disabled={busy} style={{ padding: 16 }}><Text style={{ color: '#FFD60A' }}>Import a photo</Text></Pressable>
-        <Text style={s.footnote}>JPEG or PNG from Files</Text>
-        <Pressable accessibilityRole="button" onPress={onRoll} disabled={busy} style={{ padding: 16 }}><Text style={{ color: '#a1a1aa' }}>Open Film Roll</Text></Pressable>
-        {error ? <Text accessibilityRole="alert" style={{ color: '#ff9b9b' }}>{error}</Text> : null}
-      </Animated.View>
-    </View>
-  );
+  const insets = useScreenInsets();
+  return <View style={[ui.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={ui.header}><Text style={s.brand}>vibecam</Text><Text style={ui.eyebrow}>POCKET MEMORIES</Text></View>
+    <ScrollView contentContainerStyle={s.content}>
+      <View style={s.illustration}><View style={s.orbit} /><View style={{ transform: [{ scale: 2.2 }, { rotate: '-9deg' }] }}><CameraBody color="#888c7c" accent={theme.accent} /></View><View style={s.sticker}><Text style={s.stickerText}>TAKE IT EVERYWHERE</Text></View></View>
+      <Text style={s.title}>A little camera.{'\n'}A different feeling.</Text>
+      <Text style={s.body}>Six pocket-camera looks for everyday moments. Shoot photos and short films, find your favourite colour, and keep it all close.</Text>
+      <View style={s.features}><Text style={s.feature}>6 CAMERA LOOKS</Text><View style={s.dot} /><Text style={s.feature}>ALL ON YOUR DEVICE</Text></View>
+      <Notice text={canAskAgain ? 'Allow camera access when prompted. Microphone access is only needed for video sound.' : 'Camera access is off. You can enable it in your device or browser settings, or start with a photo you already have.'} />
+      <Notice text={error} error />
+      <Button label={canAskAgain ? 'Open camera' : Platform.OS === 'web' ? 'Try camera again' : 'Open Settings'} primary icon="camera-outline" onPress={onAllow} disabled={busy} />
+      <Button label="Import a photo" icon="image-outline" onPress={onImport} disabled={busy} />
+      <Button label="My Film Roll" icon="images-outline" onPress={onRoll} disabled={busy} />
+      <Text style={s.footer}>No account. No uploads. Just your moments.</Text>
+    </ScrollView>
+  </View>;
 }
-
 const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#09090b', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 340, backgroundColor: '#18181b', borderRadius: 16, borderWidth: 1, borderColor: '#27272a', padding: 32, alignItems: 'center' },
-  iconWrap: { marginBottom: 20 },
-  iconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#27272a', alignItems: 'center', justifyContent: 'center' },
-  iconT: { fontSize: 20, color: '#a1a1aa' },
-  h: { color: '#fafafa', fontSize: 18, fontWeight: '600', letterSpacing: -0.3, marginBottom: 8 },
-  p: { color: '#a1a1aa', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
-  btn: { width: '100%', backgroundColor: '#fafafa', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  btnPressed: { opacity: 0.85 },
-  btnT: { color: '#09090b', fontSize: 14, fontWeight: '600' },
-  footnote: { color: '#52525b', fontSize: 12, marginTop: 12 },
+  brand: { color: theme.text, fontSize: 26, fontWeight: '700', letterSpacing: -1.2 },
+  content: { flexGrow: 1, paddingHorizontal: 28, paddingBottom: 24, gap: 12, justifyContent: 'center' },
+  illustration: { height: 190, alignItems: 'center', justifyContent: 'center' },
+  orbit: { position: 'absolute', width: 190, height: 190, borderRadius: 95, borderWidth: 1, borderColor: theme.line },
+  sticker: { position: 'absolute', bottom: 16, right: 20, padding: 8, borderRadius: 5, backgroundColor: theme.accent, transform: [{ rotate: '-6deg' }] },
+  stickerText: { color: theme.bg, fontSize: 9, letterSpacing: 1, fontWeight: '800' },
+  title: { color: theme.text, fontSize: 37, lineHeight: 41, fontWeight: '600', letterSpacing: -1.3, marginTop: 10 },
+  body: { color: theme.muted, fontSize: 15, lineHeight: 23, marginTop: 4 },
+  features: { flexDirection: 'row', gap: 8, alignItems: 'center', marginVertical: 10, flexWrap: 'wrap' },
+  feature: { color: theme.accent, fontSize: 9, fontWeight: '700', letterSpacing: 1 }, dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: theme.dim },
+  footer: { color: theme.dim, fontSize: 11, textAlign: 'center', marginTop: 10 },
 });

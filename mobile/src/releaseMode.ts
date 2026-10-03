@@ -7,6 +7,6 @@ export function settingsForReleaseMode(settings: Settings, cloud: boolean): Sett
   if (cloud) return settings;
   return {
     ...settings, defaultCamera: settings.defaultCamera === 'auto' ? 'g7x' : settings.defaultCamera,
-    onDeviceLook: true, dateStamp: false, frame: 'none', lightLeak: 0, dust: 0,
+    onDeviceLook: true, frame: 'none', lightLeak: 0, dust: 0,
   };
 }

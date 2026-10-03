@@ -1,89 +1,42 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FILTERS, type FilterId } from '../filters';
+import { Icon, theme } from './ui';
 
-type Props = {
-  active: FilterId | 'auto';
-  onSelect: (id: FilterId | 'auto') => void;
-  showAuto?: boolean;
-  disabled?: boolean;
-};
-
-/**
- * Camera picker styled as a row of camera bodies rather than filter chips.
- *
- * The framing matters: these are emulations of specific cameras, and presenting them as
- * little devices (badge, body, lens, status LED) sets the expectation of a camera look
- * instead of a filter. Drawn with views — no image assets to ship or scale.
- */
-export function CameraPicker({ active, onSelect, showAuto = true, disabled = false }: Props) {
-  const cameras = FILTERS.filter(f => f.id !== 'original');
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={s.row}
-      style={s.strip}
-    >
-      {showAuto && <Pressable disabled={disabled} onPress={() => onSelect('auto')} style={[s.card, active === 'auto' && s.cardOn]}>
-        <View style={[s.body, active === 'auto' && s.bodyOn]}>
-          <View style={[s.lens, { borderColor: '#22c55e' }]}>
-            <Text style={s.autoGlyph}>A</Text>
-          </View>
-          <View style={s.strap} />
-        </View>
-        <Text style={[s.name, active === 'auto' && s.nameOn]} numberOfLines={1}>Auto</Text>
-        {active === 'auto' && <View style={[s.led, { backgroundColor: '#22c55e' }]} />}
-      </Pressable>}
-
-      {cameras.map(cam => {
-        const on = active === cam.id;
-        return (
-          <Pressable accessibilityRole="button" accessibilityLabel={cam.name} accessibilityState={{ selected: on, disabled }} disabled={disabled} key={cam.id} onPress={() => onSelect(cam.id)} style={[s.card, on && s.cardOn]}>
-            <View style={[s.body, on && s.bodyOn]}>
-              <View style={[s.lens, { borderColor: cam.dot }]}>
-                <View style={[s.glass, { backgroundColor: cam.dot }]} />
-              </View>
-              <View style={s.strap} />
-              <View style={s.viewfinder} />
-            </View>
-            <Text style={[s.name, on && s.nameOn]} numberOfLines={1}>{cam.name}</Text>
-            {on && <View style={[s.led, { backgroundColor: cam.dot }]} />}
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  );
+export function CameraBody({ color, accent, small = false }: { color: string; accent: string; small?: boolean }) {
+  return <View accessible={false} style={[s.body, { backgroundColor: color }, small && { transform: [{ scale: 0.8 }] }]}>
+    <View style={s.flash} /><View style={s.grip} /><View style={[s.lens, { borderColor: accent }]}><View style={s.glass}><View style={s.glint} /></View></View>
+    <View style={[s.led, { backgroundColor: accent }]} />
+  </View>;
 }
-
+export function CameraPicker({ active, onSelect, showAuto = false, showOriginal = false, disabled = false }: {
+  active: string; onSelect: (id: FilterId | 'auto') => void; showAuto?: boolean; showOriginal?: boolean; disabled?: boolean;
+}) {
+  const scroll = useRef<ScrollView>(null);
+  const cameras = FILTERS.filter(f => showOriginal || f.id !== 'original');
+  const index = cameras.findIndex(f => f.id === active) + (showAuto ? 1 : 0);
+  useEffect(() => { scroll.current?.scrollTo({ x: Math.max(0, index * 106 - 100), animated: true }); }, [index]);
+  return <ScrollView ref={scroll} horizontal showsHorizontalScrollIndicator={false} style={s.strip} contentContainerStyle={s.row}>
+    {showAuto && <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel="Automatic camera selection" onPress={() => onSelect('auto')} style={[s.card, active === 'auto' && s.selected]}><Icon name="sparkles-outline" color={theme.accent} /><Text style={s.name}>Auto</Text></Pressable>}
+    {cameras.map(camera => <Pressable key={camera.id} disabled={disabled} onPress={() => onSelect(camera.id)} accessibilityRole="button"
+      accessibilityLabel={`${camera.name}, ${camera.tagline}`} accessibilityState={{ selected: camera.id === active, disabled }}
+      style={({ pressed }) => [s.card, camera.id === active && s.selected, pressed && { opacity: 0.7 }]}>
+      <CameraBody color={camera.body} accent={camera.dot} small />
+      <Text numberOfLines={1} style={[s.name, camera.id === active && { color: theme.accent }]}>{camera.name}</Text>
+      <View style={[s.marker, camera.id === active && { backgroundColor: theme.accent }]} />
+    </Pressable>)}
+  </ScrollView>;
+}
 const s = StyleSheet.create({
-  strip: { maxHeight: 96 },
-  row: { paddingHorizontal: 12, gap: 10, alignItems: 'flex-end', paddingBottom: 4 },
-  card: { width: 68, alignItems: 'center', gap: 5, paddingTop: 6 },
-  cardOn: {},
-
-  // A stylised compact camera body.
-  body: {
-    width: 60, height: 44, borderRadius: 9,
-    backgroundColor: '#1c1c1e',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  bodyOn: { backgroundColor: '#2c2c2e', borderColor: 'rgba(255,214,10,0.5)' },
-  lens: {
-    width: 24, height: 24, borderRadius: 12, borderWidth: 2,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0c0c0c',
-  },
-  glass: { width: 9, height: 9, borderRadius: 5, opacity: 0.9 },
-  autoGlyph: { color: '#22c55e', fontSize: 11, fontWeight: '800' },
-  // Grip ridge on the right of the body.
-  strap: { position: 'absolute', right: 5, top: 8, bottom: 8, width: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.06)' },
-  // Optical viewfinder bump, top-left.
-  viewfinder: { position: 'absolute', left: 6, top: 6, width: 10, height: 5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.10)' },
-
-  name: { color: 'rgba(255,255,255,0.5)', fontSize: 9, fontWeight: '700', textAlign: 'center' },
-  nameOn: { color: '#fff' },
-  led: { width: 5, height: 5, borderRadius: 3 },
+  strip: { flexGrow: 0, flexShrink: 0 }, row: { paddingHorizontal: 18, gap: 8, paddingVertical: 6 },
+  card: { width: 98, minHeight: 91, borderRadius: 16, borderWidth: 1, borderColor: 'transparent', paddingTop: 4, paddingBottom: 5, alignItems: 'center', justifyContent: 'center' },
+  selected: { backgroundColor: theme.surface, borderColor: theme.line },
+  name: { color: theme.muted, fontWeight: '600', fontSize: 12, marginTop: 2 }, marker: { width: 16, height: 2, marginTop: 6, borderRadius: 1 },
+  body: { width: 64, height: 41, borderRadius: 8, borderWidth: 1, borderColor: '#ffffff25', justifyContent: 'center', alignItems: 'center' },
+  lens: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: '#aaa', backgroundColor: '#161815', alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  glass: { width: 19, height: 19, borderRadius: 10, borderWidth: 2, borderColor: '#454e49', backgroundColor: '#0c1717' },
+  glint: { width: 5, height: 5, backgroundColor: '#ffffff50', borderRadius: 3, margin: 2 },
+  flash: { position: 'absolute', top: 5, left: 6, width: 12, height: 5, borderRadius: 1, backgroundColor: '#dedfd380' },
+  grip: { position: 'absolute', left: 4, bottom: 5, width: 6, height: 20, borderRadius: 2, backgroundColor: '#00000040' },
+  led: { position: 'absolute', right: 5, top: 6, width: 3, height: 3, borderRadius: 2 },
 });
