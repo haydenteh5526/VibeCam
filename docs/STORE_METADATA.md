@@ -17,16 +17,18 @@ Give everyday moments the feel of a pocket camera.
 VibeCam develops photos and short videos on your iPhone with six distinct compact-camera-inspired looks. Shoot something new or import a JPEG or PNG from Files, then find the colour and character that fits the moment.
 
 - Six camera looks, from warm and punchy to muted, crisp and nostalgic
-- Adjustable grain, vignette and highlight character for photos
+- Fine-tune photo look strength, exposure, warmth and camera texture
+- Add an amber date stamp, entirely offline
 - Record 15-second clips with sound and the selected camera colour look
 - Film Roll keeps photos and clips, plus their originals, until you delete them
 - Try another look from the original photo or video without stacking edits
-- Hold to compare your edit with the original
+- Tap Compare to switch between your edit and the original
+- Mark favourites, filter photos and videos, and delete selected Film Roll items
 - Save to Photos or share through your favourite apps
 - Flash, timer, grid and camera switching on supported devices
 - No account or internet connection required
 
-Save favourites to Photos to keep copies beyond the 60-item Film Roll. Video looks apply each camera's colour treatment; the photo-only grain and optical effects are not applied to clips. The looks are artistic approximations and do not reproduce another camera's optics or every aspect of its rendering. VibeCam is not affiliated with camera manufacturers.
+Film Roll keeps your items until you delete them, subject to available device storage. Save copies to Photos before uninstalling VibeCam. Video looks apply each camera's colour treatment; photo texture, fine-tuning and date stamps do not apply to clips. The viewfinder is unprocessed; the selected look is applied after capture. The looks are artistic interpretations and do not reproduce another camera's optics or every aspect of its rendering. VibeCam is not affiliated with camera manufacturers.
 
 ## Existing support details - verify before submission
 
