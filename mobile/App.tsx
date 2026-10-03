@@ -294,7 +294,7 @@ export default function App() {
     if (screen === 'uploading') return <UploadingScreen progress={progress} />;
     if (screen === 'preview' && photo) return <PreviewScreen
       file={fileFor(photo)}
-      captured={photo.uri} original={photo.originalUri} selectedCamera={photo.cameraId}
+      captured={photo.uri} original={photo.originalUri} selectedCamera={photo.cameraId} cameraName={photo.cameraName}
       backendReady={backend} canDevelop={photo.mediaType === 'video' ? hasVideoLooks() : backend || hasOnDeviceLook('g7x')} busy={working}
       cloudEnabled={CLOUD_FEATURES_ENABLED && photo.mediaType !== 'video'}
       grade={developing ? { kind: 'grading' } : photo.cameraId === 'original' ? { kind: 'none' } : { kind: 'graded', name: photo.cameraName }}

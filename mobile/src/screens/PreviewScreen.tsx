@@ -5,14 +5,14 @@ import { DevelopingOverlay } from '../components/DevelopingOverlay';
 import { CameraPicker } from '../components/CameraPicker';
 import { Button, Icon, IconButton, Notice, theme, ui, useScreenInsets } from '../components/ui';
 import { useLayoutHeight, useLayoutWidth } from '../components/DeviceFrame';
-import { getLook, type FilterId } from '../filters';
+import { FILTERS, type FilterId } from '../filters';
 import { DEFAULT_RECIPE, normalizeRecipe, sameRecipe, type PhotoRecipe } from '../photoRecipe';
 import type { SelectedFile } from '../types';
 import type { GradeState } from '../../App';
 
 type Props = {
   file: SelectedFile; captured: string | null; original: string | null; backendReady: boolean; cloudEnabled: boolean;
-  grade: GradeState; saved: boolean; busy: boolean; canDevelop: boolean; selectedCamera: string;
+  grade: GradeState; saved: boolean; busy: boolean; canDevelop: boolean; selectedCamera: string; cameraName: string;
   error: string; notice: string; favorite: boolean; recipe?: PhotoRecipe; takenAt: number; closeLabel: string;
   onVibe: (vibe: string) => void; onRegrade: (camera: FilterId | 'auto', recipe?: PhotoRecipe) => void;
   onClose: () => void; onSave: () => void; onShare: () => void; onUpload: () => void; onDelete: () => void; onFavorite: () => void;
@@ -27,7 +27,7 @@ function Adjustment({ label, value, display, min, max, step, onChange }: {
   </View>;
 }
 export function PreviewScreen({ file, captured, original, backendReady, cloudEnabled, grade, saved, busy, canDevelop,
-  selectedCamera, error, notice, favorite, recipe, takenAt, closeLabel, onVibe, onRegrade, onClose, onSave, onShare, onUpload, onDelete, onFavorite }: Props) {
+  selectedCamera, cameraName, error, notice, favorite, recipe, takenAt, closeLabel, onVibe, onRegrade, onClose, onSave, onShare, onUpload, onDelete, onFavorite }: Props) {
   const insets = useScreenInsets();
   const width = useLayoutWidth(), height = useLayoutHeight();
   const video = file.mimeType.startsWith('video/');
@@ -36,10 +36,15 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [vibe, setVibe] = useState('');
   const [draft, setDraft] = useState(() => normalizeRecipe(recipe));
-  useEffect(() => { setDraft(normalizeRecipe(recipe)); }, [recipe]);
-  const look = getLook(selectedCamera);
+  const { amount, exposure, warmth, character, dateStamp } = normalizeRecipe(recipe);
+  // Metadata commits normalize to a new object. Reset only for a different source
+  // or changed applied values so favouriting/saving cannot erase pending edits.
+  useEffect(() => { setDraft({ amount, exposure, warmth, character, dateStamp }); },
+    [original, amount, exposure, warmth, character, dateStamp]);
+  const look = FILTERS.find(preset => preset.id === selectedCamera);
+  const displayName = look?.name ?? cameraName;
   const dirty = !sameRecipe(draft, normalizeRecipe(recipe));
-  const canAdjust = !video && selectedCamera !== 'original' && canDevelop && !!original;
+  const canAdjust = !video && !!look && look.id !== 'original' && canDevelop && !!original;
   const update = (patch: Partial<PhotoRecipe>) => setDraft(value => ({ ...value, ...patch }));
   const select = (id: FilterId | 'auto') => {
     setShowOriginal(false);
@@ -56,12 +61,12 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
       <View style={[s.media, { height: Math.min((width - 32) * 4 / 3, height * .46) }]}>
         {video && (showOriginal ? original : captured) ? <VideoPreview uri={(showOriginal ? original : captured)!} /> :
-          captured ? <Image accessibilityRole="image" accessibilityLabel={showOriginal ? 'Original photo' : look.name + ' developed photo'} source={{ uri: (showOriginal ? original : captured)! }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
+          captured ? <Image accessibilityRole="image" accessibilityLabel={showOriginal ? 'Original photo' : displayName + ' developed photo'} source={{ uri: (showOriginal ? original : captured)! }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
         {grade.kind === 'grading' && <DevelopingOverlay label={video ? 'Developing your clip' : 'Developing your photo'} />}
         {showOriginal && <View style={s.originalBadge}><Text style={s.originalText}>ORIGINAL</Text></View>}
       </View>
       <View style={s.mediaFooter}>
-        <View><Text style={s.model}>{selectedCamera === 'original' ? 'Original' : look.name}</Text><Text style={s.date}>{new Date(takenAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} · {video ? 'Video' : 'Photo'}</Text></View>
+        <View><Text style={s.model}>{displayName}</Text><Text style={s.date}>{new Date(takenAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} · {video ? 'Video' : 'Photo'}</Text></View>
         {original && original !== captured ? <Pressable accessibilityRole="button" accessibilityLabel={showOriginal ? 'Show edited version' : 'Compare with original'} accessibilityState={{ selected: showOriginal }}
           onPress={() => setShowOriginal(value => !value)} style={s.compare}><Icon name="copy-outline" size={16} /><Text style={s.compareText}>{showOriginal ? 'Show edit' : 'Compare'}</Text></Pressable> : null}
       </View>
@@ -73,7 +78,8 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
       </View>
       {tab === 'looks' || video ? <>
         <View style={{ marginHorizontal: -16 }}><CameraPicker active={selectedCamera} onSelect={select} showOriginal showAuto={cloudEnabled} disabled={busy || !original || !canDevelop} /></View>
-        <View style={s.description}><Text style={s.descriptionTitle}>{look.tagline}</Text><Text style={ui.body}>{look.description}</Text><Text style={s.bestFor}>{look.bestFor}</Text></View>
+        {look ? <View style={s.description}><Text style={s.descriptionTitle}>{look.tagline}</Text><Text style={ui.body}>{look.description}</Text><Text style={s.bestFor}>{look.bestFor}</Text></View> :
+          <View style={s.description}><Text style={s.descriptionTitle}>{displayName}</Text><Text style={ui.body}>Your custom developed look. Save or share this version, or choose a camera to start again from the original.</Text></View>}
       </> : canAdjust ? <View style={s.adjustments} pointerEvents={busy ? 'none' : 'auto'}>
         <Text style={s.editNote}>{dirty ? 'Apply to see your changes. Your original stays untouched.' : 'Start with the camera look, then make it yours.'}</Text>
         <Adjustment label="Look strength" value={draft.amount} display={Math.round(draft.amount * 100) + '%'} min={0} max={1} step={.1} onChange={amount => update({ amount })} />
@@ -81,8 +87,8 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
         <Adjustment label="Warmth" value={draft.warmth} display={draft.warmth === 0 ? 'Neutral' : (draft.warmth > 0 ? '+' : '') + Math.round(draft.warmth * 100)} min={-1} max={1} step={.1} onChange={warmth => update({ warmth })} />
         <Adjustment label="Camera texture" value={draft.character} display={Math.round(draft.character * 100) + '%'} min={0} max={1.5} step={.25} onChange={character => update({ character })} />
         <View style={s.adjustment}><View style={{ flex: 1 }}><Text style={s.adjustmentName}>Date stamp</Text><Text style={s.date}>The date added to your Film Roll</Text></View><Switch accessibilityLabel="Photo date stamp" value={draft.dateStamp} onValueChange={dateStamp => update({ dateStamp })} trackColor={{ true: theme.accent, false: theme.line }} /></View>
-        <View style={[ui.row, { marginTop: 12 }]}><Button label="Reset" onPress={() => setDraft({ ...DEFAULT_RECIPE })} disabled={busy} /><Button label={busy ? 'Developing…' : 'Apply changes'} primary onPress={() => select(selectedCamera as FilterId)} disabled={!dirty || busy} style={{ flex: 1 }} /></View>
-      </View> : <Notice text={original ? 'Choose a camera look to fine-tune this photo.' : 'The original is unavailable. You can still save or share this edit.'} />}
+        <View style={[ui.row, { marginTop: 12 }]}><Button label="Reset" onPress={() => setDraft({ ...DEFAULT_RECIPE })} disabled={busy} /><Button label={busy ? 'Developing…' : 'Apply changes'} primary onPress={() => { if (look) select(look.id); }} disabled={!dirty || busy} style={{ flex: 1 }} /></View>
+      </View> : <Notice text={!original ? 'The original is unavailable. You can still save or share this edit.' : !look ? 'Fine-tuning is available for the six camera looks. Choose one to start again from your original; save this custom version first if you want to keep it.' : 'Choose a camera look to fine-tune this photo.'} />}
       {cloudEnabled && backendReady && original && !video && <View style={s.cloud}>
         <TextInput accessibilityLabel="Describe an AI look" placeholder="Describe a look…" placeholderTextColor={theme.dim} style={s.input} value={vibe} onChangeText={setVibe} editable={!busy} maxLength={300} />
         <Button label="Develop with AI" disabled={busy || !vibe.trim()} onPress={() => onVibe(vibe.trim())} />

@@ -1,6 +1,6 @@
 # iPhone release readiness
 
-Updated 2026-10-02. Target: an offline iPhone camera with photo and short video looks.
+Updated 2026-10-03. Target: an offline iPhone camera with photo and short video looks.
 This is a tested development foundation, not yet a device-verified App Store binary.
 
 ## Implemented
@@ -44,6 +44,10 @@ This is a tested development foundation, not yet a device-verified App Store bin
   confirmed deletion. Fake browser camera capture and timer cancellation pass.
 - Browser downloads complete when the automation browser has an explicit download
   directory. The downloaded JPEG was opened and visually verified; retry also works.
+- Review regressions checked in the browser: unapplied exposure survives favourite
+  and save actions; custom AI results retain their stored style name and cannot open
+  unsupported adjustment controls. AI preview verification used stored test metadata,
+  not a live provider request.
 - Earlier PR #26 compiled successfully in GitHub's macOS iOS Simulator job.
   Native camera, Photos, orientation, video/audio export and sharing still require hardware.
 
