@@ -103,7 +103,7 @@ export default function App() {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (locked.current) return true;
-      if (screen === 'camera') return false;
+      if (screen === 'camera' || screen === 'preview') return false;
       reset(); return true;
     });
     return () => subscription.remove();
@@ -299,7 +299,7 @@ export default function App() {
       cloudEnabled={CLOUD_FEATURES_ENABLED && photo.mediaType !== 'video'}
       grade={developing ? { kind: 'grading' } : photo.cameraId === 'original' ? { kind: 'none' } : { kind: 'graded', name: photo.cameraName }}
       saved={saved} error={error} notice={notice} onVibe={onVibe}
-      recipe={photo.recipe} favorite={photo.favorite === true} takenAt={photo.takenAt} closeLabel={previewOrigin === 'roll' ? 'Film Roll' : 'Camera'} onFavorite={onFavorite}
+      recipe={photo.recipe} favorite={photo.favorite === true} takenAt={photo.takenAt} seed={photo.seed} closeLabel={previewOrigin === 'roll' ? 'Film Roll' : 'Camera'} onFavorite={onFavorite}
       onRegrade={onRegrade} onClose={closePreview} onSave={onSave} onShare={onShare} onUpload={onUpload} onDelete={onDelete}
     />;
     if (!camPerm?.granted) return <PermissionScreen

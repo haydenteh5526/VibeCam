@@ -4,6 +4,7 @@ import { Image, Platform } from 'react-native';
 
 import { renderToFramebuffer } from './renderFrame';
 import type { PhotoRecipe } from '../photoRecipe';
+import { LUT_MODULES } from './lutAssets';
 
 /**
  * On-device look rendering.
@@ -19,16 +20,6 @@ import type { PhotoRecipe } from '../photoRecipe';
  *  - Halation, chromatic aberration, corner softness and unsharp masking need extra blur
  *    passes and stay server-side.
  */
-
-/** LUT strips are bundled per camera; keys must match FilterId. */
-const LUT_MODULES: Record<string, number> = {
-  g7x: require('../../assets/luts/g7x.png'),
-  rx100: require('../../assets/luts/rx100.png'),
-  gr: require('../../assets/luts/gr.png'),
-  x100: require('../../assets/luts/x100.png'),
-  ccd: require('../../assets/luts/ccd.png'),
-  powershot: require('../../assets/luts/powershot.png'),
-};
 
 /** Points per axis in the baked LUTs — must match backend lut.DEFAULT_SIZE. */
 export { LUT_SIZE } from './renderFrame';
