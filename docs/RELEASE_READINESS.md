@@ -59,6 +59,7 @@ This is a tested development foundation, not yet a device-verified App Store bin
 - Interactive editor walkthrough: all six draft looks, Original, exposure/date previews,
   Compare, Apply, Discard, leaving/keeping a draft, favourite preservation and reload.
   Injected WebGL context loss falls back to the applied edit; Apply still succeeds.
+  Repeated adjustments after context loss cannot falsely report a recovered preview.
   Injected IndexedDB write failure leaves the draft pending and permits a successful retry.
   Browser accessibility audit reports zero violations; icon contrast and native VoiceOver
   still require manual verification.

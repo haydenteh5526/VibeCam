@@ -91,7 +91,24 @@ document.querySelector('button')!.onclick = async () => {
     if (previewError > 2) throw new Error('Interactive preview differs from export by ' + previewError);
     const status = gl.getError();
     if (status !== gl.NO_ERROR) throw new Error(`GL error ${status}`);
-    output.textContent = `PASS: shader compiled and rendered ${width * height} pixels.\nIdentity LUT maximum channel error: ${maxError}/255.\nSix bundled PNG LUTs match CPU reference within ${bundledError.toFixed(2)}/255.\nZero strength preserves source; +1 EV matches expected pixels.\nDate stamp draws ${changed} pixels in the lower-right corner.\nInteractive preview matches export within ${previewError}/255, including repeated adjustment/revert.\nNo texture feedback or framebuffer errors.`;
+    const lossExtension = gl.getExtension('WEBGL_lose_context');
+    let lossCheck = 'Context-loss check skipped: extension unavailable.';
+    if (lossExtension) {
+      const interrupted = createPhotoRenderer(gl as ExpoWebGLRenderingContext, { localUri: 'photo' }, { localUri: 'lut' }, width, height);
+      canvas.addEventListener('webglcontextlost', event => event.preventDefault(), { once: true });
+      lossExtension.loseContext();
+      await new Promise(resolve => setTimeout(resolve, 25));
+      // Drain the one-shot error; later adjustments still have to reject the lost context.
+      gl.getError();
+      for (let attempt = 0; attempt < 3; attempt++) {
+        let rejected = false;
+        try { interrupted.draw(width, height, options); } catch { rejected = true; }
+        if (!rejected) throw new Error('Lost context was incorrectly reported as a successful preview');
+      }
+      interrupted.dispose();
+      lossCheck = 'Lost context rejects every subsequent adjustment.';
+    }
+    output.textContent = `PASS: shader compiled and rendered ${width * height} pixels.\nIdentity LUT maximum channel error: ${maxError}/255.\nSix bundled PNG LUTs match CPU reference within ${bundledError.toFixed(2)}/255.\nZero strength preserves source; +1 EV matches expected pixels.\nDate stamp draws ${changed} pixels in the lower-right corner.\nInteractive preview matches export within ${previewError}/255, including repeated adjustment/revert.\nNo texture feedback or framebuffer errors.\n${lossCheck}`;
   } catch (error) { output.textContent = `FAIL: ${String(error)}`; }
   finally { gl.getExtension('WEBGL_lose_context')?.loseContext(); }
 };

@@ -104,6 +104,9 @@ export function createPhotoRenderer(
   return {
     draw(drawWidth, drawHeight, opts, target = null) {
       if (disposed) throw new Error('Photo preview has closed');
+      // WebGL reports CONTEXT_LOST only once through getError(). Later no-op draws
+      // must not be mistaken for a recovered preview. Expo GL implements this too.
+      if (gl.isContextLost()) throw new Error('Photo graphics context is unavailable');
       gl.useProgram(program);
       gl.bindFramebuffer(gl.FRAMEBUFFER, target);
       gl.viewport(0, 0, drawWidth, drawHeight);
