@@ -15,7 +15,7 @@ export function usePhotoSurface(gl: ExpoWebGLRenderingContext | null, { source, 
   const renderer = useRef<PhotoRenderer | null>(null);
   useEffect(() => {
     if (!gl) return;
-    try { renderer.current = createPhotoRenderer(gl, source.photo, source.lut, source.width, source.height); }
+    try { renderer.current = createPhotoRenderer(gl, source.photo, source.lut, source.width, source.height, source.originalSize); }
     catch { onStatus('unavailable'); }
     return () => { renderer.current?.dispose(); renderer.current = null; };
   }, [gl, source, onStatus]);

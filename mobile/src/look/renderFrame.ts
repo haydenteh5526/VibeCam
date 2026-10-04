@@ -64,6 +64,7 @@ export type PhotoRenderer = {
 export function createPhotoRenderer(
   gl: ExpoWebGLRenderingContext, photo: TextureSource, lutAsset: TextureSource,
   width: number, height: number,
+  originalSize = { width, height },
 ): PhotoRenderer {
   const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
   if (!width || !height || width > max || height > max) throw new Error('Photo exceeds this device GPU limit');
@@ -118,7 +119,7 @@ export function createPhotoRenderer(
       set('uAmount', recipe.amount);
       set('uExposure', recipe.exposure);
       set('uWarmth', recipe.warmth);
-      gl.uniform2f(gl.getUniformLocation(program, 'uImageSize'), width, height);
+      gl.uniform2f(gl.getUniformLocation(program, 'uImageSize'), originalSize.width, originalSize.height);
       const date = new Date(opts.takenAt ?? 0);
       set('uDateStamp', recipe.dateStamp && !!opts.takenAt ? 1 : 0);
       gl.uniform3f(gl.getUniformLocation(program, 'uDate'), date.getFullYear() % 100, date.getMonth() + 1, date.getDate());

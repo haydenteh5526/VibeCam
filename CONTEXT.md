@@ -35,7 +35,9 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 - PhotoLookPreview + PhotoSurface reuse the same renderer for interactive draft edits.
   The photo stays visible while adjusting. Apply renders/commits at full resolution;
   Discard restores the applied edit. Export is unavailable until a draft is applied/discarded.
-  No preview files are persisted; GL resources are released before export/on background.
+  Preview sources are capped at 1280px and reused across camera choices. Native
+  thumbnails live in purgeable cache and are deleted on exit. GL resources are released
+  before export/on background. The original is reserved for full-quality Apply.
 - LUT PNG layout is FLAT .cube order: red fastest, then green horizontally, blue by row.
   It is not the conventional blue-tile layout. CPU, shader and video must agree.
 - src/look/videoLuts.ts is generated from these same PNGs by npm run assets:video-luts.

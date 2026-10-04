@@ -17,6 +17,8 @@ This is a tested development foundation, not yet a device-verified App Store bin
 - The editor keeps the photo visible above compact adjustment panels. Save/Share only
   appear after applying/discarding a draft, preventing export of an older edit by mistake.
   GPU previews draw on changes (no continuous render loop) and release on background.
+  One resized source (long edge at most 1280px) is reused across camera choices; native
+  decode jobs are serialized and temporary thumbnails are deleted when editing ends.
   Preview failure clearly shows the last applied edit and still allows full-quality Apply.
 - Corrected an existing LUT axis mismatch: green and blue were swapped by the photo
   shader and video table generator. Both now follow the actual PNG .cube ordering.
@@ -37,7 +39,7 @@ This is a tested development foundation, not yet a device-verified App Store bin
 
 ## Verification
 
-- 74 mobile tests and TypeScript pass, including recipe validation, metadata restart,
+- 77 mobile tests and TypeScript pass, including recipe validation, metadata restart,
   atomic bulk deletion and real bundled video LUT ordering.
 - 120 backend tests pass, including highlight monotonicity and hue preservation.
 - Expo Doctor: 18/18 checks after installing the SDK-compatible expo-font peer.
@@ -60,6 +62,8 @@ This is a tested development foundation, not yet a device-verified App Store bin
   Compare, Apply, Discard, leaving/keeping a draft, favourite preservation and reload.
   Injected WebGL context loss falls back to the applied edit; Apply still succeeds.
   Repeated adjustments after context loss cannot falsely report a recovered preview.
+  A browser 8064x6048 import uploads only a 1280x960 preview texture, and three camera
+  choices reuse the same resized source. Native decode peak memory still needs profiling.
   Injected IndexedDB write failure leaves the draft pending and permits a successful retry.
   Browser accessibility audit reports zero violations; icon contrast and native VoiceOver
   still require manual verification.
@@ -99,7 +103,7 @@ Use a signed standalone preview build, including the local video module.
 - Measured paired-shot calibration; see CAMERA_CALIBRATION.md. The live viewfinder is
   unprocessed and says the look is applied after capture. Do not advertise exact matching.
 - Review final privacy/support URLs, store copy and screenshots against the actual binary.
-- Assess remaining SDK 54 toolchain advisories (18: 12 moderate, 6 high in local npm audit).
+- Assess remaining SDK 54 toolchain advisories (35: 11 moderate, 24 high in the October 4 npm audit).
   Several fixes require a major Expo migration; perform that separately with device regression checks.
 - Cloud features remain outside v1. They need user isolation, retention/deletion and a
   corrected/tested optional AI integration before public exposure.
