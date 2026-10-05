@@ -11,8 +11,9 @@ named physical camera is claimed; see CAMERA_CALIBRATION.md.
 
 ## iPhone integration
 
-Build the custom app to include the local VibeCamVideo view. Its capability constant
-prevents Expo Go and older builds from attempting to load an unavailable native view.
+Build the custom app to include the local VibeCamVideo view. Live colour requires iOS 16+
+for preview-sized buffers and movie/data-output coexistence. Its capability constant
+keeps iOS 15, Expo Go and older builds on the working raw preview.
 Keep CameraView and LiveLookPreview inside the same uncollapsible finder parent.
 The overlay resolves the camera via ExpoModulesCore's EXCameraInterface, which
 expo-camera implements. It does not depend on the old React bridge or private refs.
@@ -48,7 +49,9 @@ iPhone-shaped test launcher; it does not emulate native iOS hardware or Photos.
 - `npm test`: crop geometry and truthful preview captions, alongside existing app tests.
 - `npm run test:gpu`: real shader, all six PNG tables, replacing frames, context loss.
 - macOS CI: builds a colour sweep from the independent CPU reference and executes
-  `LookCube.swift` using Core Image, then compiles the unsigned iOS Simulator app.
+  `LookCube.swift` using Core Image, checks portrait/landscape pixel buffers through
+  the Metal presentation path (including all four corners), then compiles the unsigned
+  iOS Simulator app. The native test caught and verified the fix for a vertical flip.
 - Browser walkthrough: real frame changes, six looks, comparison, capture, compact
   screens, repeated toggles, camera flip, failure fallback and recovery.
 - Required before shipping: physical iPhone view hierarchy/attachment, orientation,

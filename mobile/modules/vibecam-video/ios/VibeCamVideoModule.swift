@@ -26,7 +26,11 @@ private enum VideoLookError: LocalizedError {
 public class VibeCamVideoModule: Module {
   public func definition() -> ModuleDefinition {
     Name("VibeCamVideo")
-    Constants(["hasLiveColourPreview": true])
+    // iOS 16 adds preview-sized buffers and movie/data-output coexistence. Older
+    // iPhones keep the raw preview instead of allocating full-sensor frame pools.
+    Constants(["hasLiveColourPreview": ProcessInfo.processInfo.isOperatingSystemAtLeast(
+      OperatingSystemVersion(majorVersion: 16, minorVersion: 0, patchVersion: 0)
+    )])
     View(LiveColourView.self) {
       Events("onStatus")
       Prop("cubeBase64") { (view: LiveColourView, cube: String) in view.cubeBase64 = cube }

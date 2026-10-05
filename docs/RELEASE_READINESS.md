@@ -10,11 +10,11 @@ This is a tested development foundation, not yet a device-verified App Store bin
 - Photo/video mode, actual hardware lens choices when available, flash/torch, timer
   with cancellation, grid, digital zoom and microphone permission handling.
 - One camera picker across capture, editing and settings; the last selected camera is remembered.
-- Live colour previews for six looks in custom iPhone builds and the browser. Compare
+- Live colour previews for six looks in custom iPhone builds (iOS 16+) and the browser. Compare
   Original/Look without changing the selected capture look. Native processing shares
   the existing capture session; browser processing shares the existing camera stream.
   Late frames are dropped, display size is capped, and preview failure exposes the raw
-  feed with Retry. Expo Go, older builds and Android keep the raw feed without a dead
+  feed with Retry. iOS 15, Expo Go, older builds and Android keep the raw feed without a dead
   Retry control. Photo character/date are added after capture, as the caption explains.
 - Six offline photo looks plus Original. Strength, exposure, warmth and texture adjustments
   and an amber date stamp are stored per photo. Interactive editing previews use the
@@ -59,6 +59,8 @@ This is a tested development foundation, not yet a device-verified App Store bin
   within 0.56/255 across 4,096 colours for each of the six looks and an identity table.
   Both live preview and video export explicitly use the LUT's encoded sRGB working space.
   This validates the transform, not physical camera capture or screen colour calibration.
+  The native Metal test also checks all four corners of portrait/landscape pixel buffers
+  through the actual aspect-fill presentation path, catching and fixing a vertical flip.
 - Browser live viewfinder at 390x844 and 375x667: all six camera colours verified on
   a controlled moving canvas feed, Original/Look toggling, active-look reselection,
   front/back mirroring, capture while comparing Original (selected look still saved),

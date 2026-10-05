@@ -48,7 +48,7 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
   frame in flight, 24 fps and a 1280px display limit. No per-frame JS bridge or files.
   The web overlay uses the photo shader, the existing video, and a bounded canvas.
   Original/Look compares without changing the captured look. Failure hides the overlay;
-  Retry restores it where supported. Expo Go/old builds/Android retain raw preview.
+  Retry restores it where supported. iOS 15/Expo Go/old builds/Android retain raw preview.
   Live colour excludes photo character/date finishing; it is not exact hardware emulation.
   See docs/LIVE_VIEWFINDER.md for integration and device validation.
 - src/rollRepository.ts serializes durable commits. Original, rendered image and poster
