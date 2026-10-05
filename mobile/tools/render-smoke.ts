@@ -89,6 +89,23 @@ document.querySelector('button')!.onclick = async () => {
       }
     } finally { live.dispose(); }
     if (previewError > 2) throw new Error('Interactive preview differs from export by ' + previewError);
+    // Camera frames replace only the photo texture. A changing source must be
+    // visible immediately without losing the LUT or allocating another renderer.
+    const frame = document.createElement('canvas'); frame.width = width; frame.height = height;
+    const frameContext = frame.getContext('2d')!;
+    frameContext.fillStyle = 'rgb(40,100,190)'; frameContext.fillRect(0, 0, width, height);
+    const stream = createPhotoRenderer(gl as ExpoWebGLRenderingContext, frame, { localUri: 'lut' }, width, height);
+    try {
+      for (const colour of [[40, 100, 190], [180, 70, 25], [20, 220, 140]]) {
+        frameContext.fillStyle = `rgb(${colour.join(',')})`; frameContext.fillRect(0, 0, width, height);
+        stream.updatePhoto(frame);
+        stream.draw(width, height, { camera: 'g7x', characterStrength: 0, seed: 0 });
+        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, actual);
+        for (let i = 0; i < actual.length; i++) {
+          if (i % 4 < 3 && Math.abs(actual[i] - colour[i % 4]) > 2) throw new Error('Camera frame update kept stale pixels');
+        }
+      }
+    } finally { stream.dispose(); }
     const status = gl.getError();
     if (status !== gl.NO_ERROR) throw new Error(`GL error ${status}`);
     const lossExtension = gl.getExtension('WEBGL_lose_context');

@@ -1,6 +1,6 @@
 # VibeCam project context
 
-Updated 2026-10-04. This document supersedes the historical branch/status notes.
+Updated 2026-10-05. This document supersedes the historical branch/status notes.
 
 ## Product
 
@@ -21,7 +21,7 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 - Prior offline workflow PR #26 merged. Old draft PR #21 is closed; its prototype
   survives as tag archive/visioncamera-manual-controls-2026-07. Stale branches were removed.
 - PR #27 merged the refined camera, editor and Film Roll, plus corrected LUT axes.
-- Interactive photo editing previews are developed on codex/live-photo-preview.
+- PR #28 merged interactive photo editing previews. PR #29 adds live camera colour.
 - docs/RELEASE_READINESS.md records verification and the remaining physical iPhone gates.
 
 ## Architecture
@@ -42,6 +42,15 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
   It is not the conventional blue-tile layout. CPU, shader and video must agree.
 - src/look/videoLuts.ts is generated from these same PNGs by npm run assets:video-luts.
   modules/vibecam-video is the native Core Image/AVFoundation video exporter.
+- LiveLookPreview overlays the selected colour table on Expo Camera's existing feed.
+  Native LiveColourView finds the sibling through EXCameraInterface and adds/removes
+  one video-data output on its session queue. It uses Core Image/Metal, at most one
+  frame in flight, 24 fps and a 1280px display limit. No per-frame JS bridge or files.
+  The web overlay uses the photo shader, the existing video, and a bounded canvas.
+  Original/Look compares without changing the captured look. Failure hides the overlay;
+  Retry restores it where supported. iOS 15/Expo Go/old builds/Android retain raw preview.
+  Live colour excludes photo character/date finishing; it is not exact hardware emulation.
+  See docs/LIVE_VIEWFINDER.md for integration and device validation.
 - src/rollRepository.ts serializes durable commits. Original, rendered image and poster
   are retained before the index is written; only unreferenced owned files are removed afterward.
   Favourites, saved status and recipes survive restart. Bulk deletion commits once.
@@ -55,12 +64,13 @@ Run npm run typecheck and npm test in mobile; run .venv/Scripts/python.exe -m py
 from backend (use the full path to the interpreter).
 npm run test:gpu serves the real shader check on localhost:8082; press Run GPU check.
 npx expo export --platform all checks bundles. npx expo-doctor checks dependencies.
-GitHub macOS CI compiles an unsigned Simulator build; it does not validate real camera,
+GitHub macOS CI checks the actual Core Image LUT against 4,096 colours per table and
+compiles an unsigned Simulator build; it does not validate real camera,
 microphone, native image orientation, Photos, sharing or thermal behaviour.
 
 ## Next release work
 
 Produce a signed iPhone preview build; follow docs/RELEASE_READINESS.md on hardware.
-Calibrate against paired camera/iPhone shots. A real processed live viewfinder requires
-a native frame pipeline; the current viewfinder explicitly shows the unprocessed camera.
+Validate live colour preview framing, front mirroring, recording coexistence and battery
+on hardware, then calibrate against paired camera/iPhone shots.
 Video currently uses camera colour, without photo texture/date adjustments.
