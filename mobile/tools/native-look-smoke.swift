@@ -11,7 +11,7 @@ struct Fixture: Decodable {
   static func main() throws {
     let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))
     let width = fixture.pixels.count
-    let input = fixture.pixels.flatMap { $0 + [255] }
+    let input: [UInt8] = fixture.pixels.flatMap { $0 + [UInt8(255)] }
     let image = CIImage(bitmapData: Data(input), bytesPerRow: width * 4, size: CGSize(width: width, height: 1),
                         format: .RGBA8, colorSpace: LookCube.colourSpace)
     let context = CIContext(options: LookCube.contextOptions)
