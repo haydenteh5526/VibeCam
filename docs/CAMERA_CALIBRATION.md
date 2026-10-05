@@ -36,8 +36,9 @@ the new edit. Already exported Photos copies cannot be changed by this update.
 
 ## Next experience improvements
 
-- A native processed live viewfinder so framing and exposure decisions use the actual
-  selected look. Current expo-camera preview is unprocessed and labelled accordingly.
+- Validate the new live colour viewfinder on hardware: it applies the selected LUT,
+  while photo character (including tonal finishing, vignette and grain) and dates are
+  developed after capture. Expo Go/unsupported builds use the labelled raw preview.
 - Per-camera capture guidance and calibrated defaults, based on the paired evidence.
 - Video character/exposure controls only after measuring a stable native render budget.
 - A TestFlight feedback pass focused on first capture, switching cameras, comparing,

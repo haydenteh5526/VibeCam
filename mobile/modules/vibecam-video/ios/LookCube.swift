@@ -1,5 +1,6 @@
 import CoreImage
 import Foundation
+import Metal
 
 /// The PNG strips and video tables both store red fastest, then green, then blue.
 enum LookCube {
@@ -30,5 +31,15 @@ enum LookCube {
     filter.setValue(data, forKey: "inputCubeData")
     filter.setValue(colourSpace, forKey: "inputColorSpace")
     return filter
+  }
+
+  static func renderPreview(_ input: CIImage, context: CIContext, texture: MTLTexture, commands: MTLCommandBuffer) {
+    let size = CGSize(width: texture.width, height: texture.height)
+    let scale = max(size.width / input.extent.width, size.height / input.extent.height)
+    var image = input.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+    image = image.transformed(by: CGAffineTransform(translationX: (size.width - image.extent.width) / 2 - image.extent.minX,
+                                                     y: (size.height - image.extent.height) / 2 - image.extent.minY))
+    context.render(image, to: texture, commandBuffer: commands,
+                   bounds: CGRect(origin: .zero, size: size), colorSpace: colourSpace)
   }
 }

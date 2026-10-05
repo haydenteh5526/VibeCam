@@ -1,6 +1,6 @@
 # iPhone release readiness
 
-Updated 2026-10-04. Target: an offline iPhone camera with photo and short video looks.
+Updated 2026-10-05. Target: an offline iPhone camera with photo and short video looks.
 This is a tested development foundation, not yet a device-verified App Store binary.
 
 ## Implemented
@@ -10,6 +10,12 @@ This is a tested development foundation, not yet a device-verified App Store bin
 - Photo/video mode, actual hardware lens choices when available, flash/torch, timer
   with cancellation, grid, digital zoom and microphone permission handling.
 - One camera picker across capture, editing and settings; the last selected camera is remembered.
+- Live colour previews for six looks in custom iPhone builds and the browser. Compare
+  Original/Look without changing the selected capture look. Native processing shares
+  the existing capture session; browser processing shares the existing camera stream.
+  Late frames are dropped, display size is capped, and preview failure exposes the raw
+  feed with Retry. Expo Go, older builds and Android keep the raw feed without a dead
+  Retry control. Photo character/date are added after capture, as the caption explains.
 - Six offline photo looks plus Original. Strength, exposure, warmth and texture adjustments
   and an amber date stamp are stored per photo. Interactive editing previews use the
   export shader; Apply renders and commits at full quality. Camera changes are previewed
@@ -39,7 +45,7 @@ This is a tested development foundation, not yet a device-verified App Store bin
 
 ## Verification
 
-- 77 mobile tests and TypeScript pass, including recipe validation, metadata restart,
+- 79 mobile tests and TypeScript pass, including recipe validation, metadata restart,
   atomic bulk deletion and real bundled video LUT ordering.
 - 120 backend tests pass, including highlight monotonicity and hue preservation.
 - Expo Doctor: 18/18 checks after installing the SDK-compatible expo-font peer.
@@ -49,6 +55,16 @@ This is a tested development foundation, not yet a device-verified App Store bin
   lower-right stamp placement also pass. Interactive preview matches the export target
   exactly at test resolution (0/255), including repeated exposure adjustment and revert.
   Display scaling and JPEG compression can affect screen/export pixel comparisons.
+- The shared native Core Image colour filter matches the CPU/photo LUT reference
+  within 0.56/255 across 4,096 colours for each of the six looks and an identity table.
+  Both live preview and video export explicitly use the LUT's encoded sRGB working space.
+  This validates the transform, not physical camera capture or screen colour calibration.
+- Browser live viewfinder at 390x844 and 375x667: all six camera colours verified on
+  a controlled moving canvas feed, Original/Look toggling, active-look reselection,
+  front/back mirroring, capture while comparing Original (selected look still saved),
+  compact picker, GPU context-loss fallback/retry and stalled-feed fallback. Repeated
+  toggling leaves one preview surface; capture remains available after preview failure.
+  The GPU check also exercises repeated source-frame replacement without stale pixels.
 - Browser walkthrough at 428x926 and 375x667: JPEG import, camera changes, adjustments,
   stamp, compare, favourites, reload persistence, settings return, filtering and
   confirmed deletion. Fake browser camera capture and timer cancellation pass.
@@ -65,8 +81,9 @@ This is a tested development foundation, not yet a device-verified App Store bin
   A browser 8064x6048 import uploads only a 1280x960 preview texture, and three camera
   choices reuse the same resized source. Native decode peak memory still needs profiling.
   Injected IndexedDB write failure leaves the draft pending and permits a successful retry.
-  Browser accessibility audit reports zero violations; icon contrast and native VoiceOver
-  still require manual verification.
+  Browser WCAG 2 A/AA audit reports zero violations; icon contrast, the live video
+  surface and native VoiceOver still require manual verification. The full web audit
+  also flags existing document heading/landmark structure outside the WCAG-tagged run.
 - PR #27 compiled successfully in GitHub's macOS iOS Simulator job.
   Native camera, Photos, orientation, video/audio export and sharing still require hardware.
 
@@ -95,13 +112,18 @@ Use a signed standalone preview build, including the local video module.
 9. Record each video look with and without microphone permission; stop early and at
    the 15-second limit. Verify colour, dimensions, orientation, sound, poster, restyle,
    restart, Photos and Share. Repeat after backgrounding and in low storage.
-10. Measure repeated-capture latency, peak memory, warm-device performance and battery.
+10. Check live colour on every lens and mode: portrait orientation, aspect-fill crop,
+    front mirroring, Original/Look, fast selection, interruptions and background/resume.
+    Ensure video/audio recording remains reliable with the optional preview output.
+    Failure must reveal the raw camera, never leave a frozen styled image. Test Retry.
+    Compare colour-only preview with exports, allowing for photo character/date finishing.
+11. Measure repeated-capture latency, peak memory, warm-device performance and battery.
 
 ## Remaining release gates
 
 - A signed preview/TestFlight build and the physical iPhone walkthrough above.
-- Measured paired-shot calibration; see CAMERA_CALIBRATION.md. The live viewfinder is
-  unprocessed and says the look is applied after capture. Do not advertise exact matching.
+- Measured paired-shot calibration; see CAMERA_CALIBRATION.md. The live viewfinder
+  previews colour, not the full photo finish or real-camera optics. Do not advertise exact matching.
 - Review final privacy/support URLs, store copy and screenshots against the actual binary.
 - Assess remaining SDK 54 toolchain advisories (35: 11 moderate, 24 high in the October 4 npm audit).
   Several fixes require a major Expo migration; perform that separately with device regression checks.

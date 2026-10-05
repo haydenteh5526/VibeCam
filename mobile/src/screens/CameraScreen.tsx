@@ -78,7 +78,8 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     if (mounted.current) setCountdown(null);
   }, []);
   const chooseCamera = (id: FilterId | 'auto') => {
-    setCamera(id); setOriginalPreview(false); setPreviewStatus('loading');
+    if (id !== camera || originalPreview) setPreviewStatus('loading');
+    setCamera(id); setOriginalPreview(false);
     onCameraChange(id); buzz();
   };
   useEffect(() => {
@@ -226,14 +227,14 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
       onSelect={chooseCamera} />}
     <View style={s.previewRow}>
       <Text style={s.caption}>{previewCaption(camera, mode, originalPreview, previewStatus)}</Text>
-      {supportsLiveColour && camera !== 'original' && camera !== 'auto' && <Pressable accessibilityRole="button"
+      {supportsLiveColour && camera !== 'original' && camera !== 'auto' && <Pressable accessibilityRole="button" disabled={busy}
         accessibilityLabel={originalPreview ? 'Show camera look' : previewStatus === 'unavailable' ? 'Retry live colour preview' : 'Show original preview'}
-        accessibilityState={{ selected: !originalPreview && previewStatus === 'live' }}
+        accessibilityState={{ selected: !originalPreview && previewStatus === 'live', disabled: busy }}
         onPress={() => {
           if (!originalPreview && previewStatus === 'unavailable') { setPreviewStatus('loading'); setPreviewAttempt(v => v + 1); }
           else { setOriginalPreview(v => !v); setPreviewStatus('loading'); }
           buzz();
-        }} style={s.previewToggle}>
+        }} style={[s.previewToggle, busy && ui.disabled]}>
         <Icon name={originalPreview ? 'eye-off-outline' : previewStatus === 'unavailable' ? 'refresh-outline' : 'eye-outline'} size={16} color={theme.accent} />
         <Text style={s.previewLabel}>{originalPreview ? 'ORIGINAL' : previewStatus === 'unavailable' ? 'RETRY' : 'LOOK'}</Text>
       </Pressable>}

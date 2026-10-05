@@ -79,7 +79,7 @@ private final class PreviewFrames: NSObject, AVCaptureVideoDataOutputSampleBuffe
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       guard let view else { slot.signal(); return }
-      view.draw(pixel, from: self) { [self] in slot.signal() }
+      view.draw(pixel, from: self) { [self] in self.slot.signal() }
     }
   }
 }
@@ -127,7 +127,7 @@ final class LiveColourView: ExpoView {
       layer.colorspace = LookCube.colourSpace
       layer.maximumDrawableCount = 2
       commands = device.makeCommandQueue()
-      context = CIContext(mtlDevice: device, options: LookCube.contextOptions)
+      if let commands { context = CIContext(mtlCommandQueue: commands, options: LookCube.contextOptions) }
     }
   }
 
@@ -200,16 +200,10 @@ final class LiveColourView: ExpoView {
     else { done(); return }
     let version = revision
     filter.setValue(CIImage(cvPixelBuffer: pixel), forKey: kCIInputImageKey)
-    guard var image = filter.outputImage else { done(); unavailable(frames); return }
+    guard let image = filter.outputImage else { done(); unavailable(frames); return }
     // Do not let the reusable filter retain an extra camera buffer after this draw.
     filter.setValue(nil, forKey: kCIInputImageKey)
-    let size = surface.metalLayer.drawableSize
-    let scale = max(size.width / image.extent.width, size.height / image.extent.height)
-    image = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-    image = image.transformed(by: CGAffineTransform(translationX: (size.width - image.extent.width) / 2 - image.extent.minX,
-                                                     y: (size.height - image.extent.height) / 2 - image.extent.minY))
-    context.render(image, to: drawable.texture, commandBuffer: buffer,
-                   bounds: CGRect(origin: .zero, size: size), colorSpace: LookCube.colourSpace)
+    LookCube.renderPreview(image, context: context, texture: drawable.texture, commands: buffer)
     buffer.present(drawable)
     buffer.addCompletedHandler { [weak self] command in
       // Explicitly keep the source buffer alive until Core Image finishes using it.
