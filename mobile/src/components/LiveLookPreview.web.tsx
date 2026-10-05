@@ -4,6 +4,8 @@ import { createPhotoRenderer, type PhotoRenderer } from '../look/renderFrame';
 import { loadPreviewLut } from '../look/previewSource';
 import { previewCrop, type LivePreviewProps } from '../look/livePreview';
 
+export const supportsLiveColour = true;
+
 export function LiveLookPreview({ camera, mirrored, onStatus }: LivePreviewProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -32,6 +34,7 @@ export function LiveLookPreview({ camera, mirrored, onStatus }: LivePreviewProps
       onStatus('unavailable');
     };
     const lost = (event: Event) => { event.preventDefault(); unavailable(); };
+    const loadingTimeout = setTimeout(() => { if (!live) unavailable(); }, 4000);
     const visibility = () => {
       element.style.opacity = '0'; live = false;
       lastVideoTime = -1; lastProgress = performance.now();
@@ -63,7 +66,7 @@ export function LiveLookPreview({ camera, mirrored, onStatus }: LivePreviewProps
           else renderer.updatePhoto(frame);
           renderer.draw(width, height, { camera, characterStrength: 0, seed: 0 });
           element.style.opacity = '1';
-          if (!live) { live = true; onStatus('live'); }
+          if (!live) { live = true; clearTimeout(loadingTimeout); onStatus('live'); }
         } catch { unavailable(); }
       };
       lastProgress = performance.now();
@@ -71,6 +74,7 @@ export function LiveLookPreview({ camera, mirrored, onStatus }: LivePreviewProps
     }).catch(unavailable);
     return () => {
       cancelled = true; cancelAnimationFrame(raf);
+      clearTimeout(loadingTimeout);
       element.style.opacity = '0';
       element.removeEventListener('webglcontextlost', lost);
       document.removeEventListener('visibilitychange', visibility);

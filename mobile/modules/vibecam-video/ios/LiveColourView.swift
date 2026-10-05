@@ -1,6 +1,5 @@
 import AVFoundation
 import CoreImage
-import ExpoCamera
 import ExpoModulesCore
 import Metal
 import QuartzCore
@@ -22,7 +21,7 @@ private final class PreviewFrames: NSObject, AVCaptureVideoDataOutputSampleBuffe
   private var lastFrame = 0.0 // Only accessed on the frame queue.
   weak var view: LiveColourView?
 
-  init(camera: ExpoCamera.CameraView, view: LiveColourView) {
+  init(camera: EXCameraInterface, view: LiveColourView) {
     session = camera.session
     sessionQueue = camera.sessionQueue
     self.view = view
@@ -162,9 +161,9 @@ final class LiveColourView: ExpoView {
     }
   }
 
-  private func cameraSibling() -> ExpoCamera.CameraView? {
-    func find(_ node: UIView) -> ExpoCamera.CameraView? {
-      if let camera = node as? ExpoCamera.CameraView { return camera }
+  private func cameraSibling() -> EXCameraInterface? {
+    func find(_ node: UIView) -> EXCameraInterface? {
+      if let camera = node as? EXCameraInterface { return camera }
       for child in node.subviews where child !== self {
         if let camera = find(child) { return camera }
       }

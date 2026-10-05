@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, AppState, Image, Linking, Pressable, Style
 import { CameraView, type CameraType, type FlashMode, useMicrophonePermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { CameraPicker } from '../components/CameraPicker';
-import { LiveLookPreview } from '../components/LiveLookPreview';
+import { LiveLookPreview, supportsLiveColour } from '../components/LiveLookPreview';
 import { previewCaption, type LivePreviewStatus } from '../look/livePreview';
 import { Icon, IconButton, Notice, theme, ui, useScreenInsets } from '../components/ui';
 import { useLayoutHeight, useLayoutWidth } from '../components/DeviceFrame';
@@ -77,6 +77,10 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     countdownTimer.current = null;
     if (mounted.current) setCountdown(null);
   }, []);
+  const chooseCamera = (id: FilterId | 'auto') => {
+    setCamera(id); setOriginalPreview(false); setPreviewStatus('loading');
+    onCameraChange(id); buzz();
+  };
   useEffect(() => {
     mounted.current = true;
     const sub = AppState.addEventListener('change', state => {
@@ -94,13 +98,14 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     };
   }, [cancelTimer]);
   const cameraReady = async () => {
+    const instance = cam.current;
     setReady(true);
     try {
-      const options = lensOptions((await cam.current?.getAvailableLensesAsync()) ?? []);
-      if (!mounted.current) return;
+      const options = lensOptions((await instance?.getAvailableLensesAsync()) ?? []);
+      if (!mounted.current || cam.current !== instance) return;
       setLenses(options);
       setLens(previous => previous ?? options.find(l => l.label === 'Wide')?.name);
-    } catch { if (mounted.current) setLenses([]); }
+    } catch { if (mounted.current && cam.current === instance) setLenses([]); }
   };
   const capture = async () => {
     if (!cam.current || !ready || lock.current) return;
@@ -218,10 +223,10 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     </Pressable>
     {info && !compact && <View style={s.info}><Text style={ui.body}>{look.description}</Text><Text style={s.infoBest}>{look.bestFor}</Text></View>}
     {!compact && <CameraPicker active={camera} showAuto={cloudEnabled && mode === 'photo'} showOriginal disabled={busy}
-      onSelect={id => { setCamera(id); onCameraChange(id); buzz(); }} />}
+      onSelect={chooseCamera} />}
     <View style={s.previewRow}>
       <Text style={s.caption}>{previewCaption(camera, mode, originalPreview, previewStatus)}</Text>
-      {camera !== 'original' && camera !== 'auto' && <Pressable accessibilityRole="button"
+      {supportsLiveColour && camera !== 'original' && camera !== 'auto' && <Pressable accessibilityRole="button"
         accessibilityLabel={originalPreview ? 'Show camera look' : previewStatus === 'unavailable' ? 'Retry live colour preview' : 'Show original preview'}
         accessibilityState={{ selected: !originalPreview && previewStatus === 'live' }}
         onPress={() => {
@@ -254,7 +259,7 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     {chooseLook && compact && <View style={s.lookModal} accessibilityViewIsModal>
       <View style={s.lookSheet}>
         <View style={ui.header}><Text style={[s.lookName, { fontSize: 20 }]}>Choose your camera</Text><IconButton icon="close" label="Close camera choices" onPress={() => setChooseLook(false)} /></View>
-        <CameraPicker active={camera} showAuto={cloudEnabled && mode === 'photo'} showOriginal onSelect={id => { setCamera(id); onCameraChange(id); setChooseLook(false); buzz(); }} />
+        <CameraPicker active={camera} showAuto={cloudEnabled && mode === 'photo'} showOriginal onSelect={id => { chooseCamera(id); setChooseLook(false); }} />
         <View style={s.info}><Text style={ui.body}>{look.description}</Text></View>
       </View>
     </View>}

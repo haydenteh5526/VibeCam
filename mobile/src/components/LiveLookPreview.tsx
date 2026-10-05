@@ -13,6 +13,7 @@ const nativePreviewModule = Platform.OS === 'ios'
   ? requireOptionalNativeModule<{ hasLiveColourPreview?: boolean }>('VibeCamVideo') : null;
 const ColourView = nativePreviewModule?.hasLiveColourPreview
   ? requireNativeViewManager<NativeProps>('VibeCamVideo') : null;
+export const supportsLiveColour = ColourView !== null;
 
 export function LiveLookPreview({ camera, onStatus }: LivePreviewProps) {
   const cube = VIDEO_LUTS[camera];
