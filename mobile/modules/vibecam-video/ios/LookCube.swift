@@ -39,6 +39,9 @@ enum LookCube {
     var image = input.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
     image = image.transformed(by: CGAffineTransform(translationX: (size.width - image.extent.width) / 2 - image.extent.minX,
                                                      y: (size.height - image.extent.height) / 2 - image.extent.minY))
+    // Core Image uses bottom-left coordinates; the displayed Metal texture uses
+    // top-left rows. Flip only this presentation path, never the video export.
+    image = image.transformed(by: CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: size.height))
     context.render(image, to: texture, commandBuffer: commands,
                    bounds: CGRect(origin: .zero, size: size), colorSpace: colourSpace)
   }

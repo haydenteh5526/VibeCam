@@ -72,8 +72,7 @@ struct Fixture: Decodable {
         let offset = (point.1 * 12 + point.0) * 4
         for c in 0..<4 {
           guard abs(Int(rendered[offset + c]) - Int(colours[index][c])) <= 2 else {
-            print("Unexpected corner \(index): \(Array(rendered[offset..<(offset + 4)])), expected \(colours[index])")
-            throw NSError(domain: "Preview orientation or crop differs from camera buffer", code: 5)
+            throw NSError(domain: "Preview corner \(index): \(Array(rendered[offset..<(offset + 4)])), expected \(colours[index])", code: 5)
           }
         }
       }
