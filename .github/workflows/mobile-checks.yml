@@ -54,6 +54,14 @@ jobs:
         working-directory: mobile
         run: npm ci
 
+      - name: Verify native colour against photo LUTs
+        # Run the real Core Image filter on macOS before compiling the iPhone view.
+        working-directory: mobile
+        run: |
+          npx tsx tools/native-look-fixture.ts "$RUNNER_TEMP/native-look.json"
+          swiftc modules/vibecam-video/ios/LookCube.swift tools/native-look-smoke.swift -o "$RUNNER_TEMP/native-look-check"
+          "$RUNNER_TEMP/native-look-check" "$RUNNER_TEMP/native-look.json"
+
       - name: Generate iOS project
         working-directory: mobile
         run: npx expo prebuild --platform ios --no-install --non-interactive

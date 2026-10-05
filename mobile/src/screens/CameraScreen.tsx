@@ -3,6 +3,8 @@ import { ActivityIndicator, Animated, AppState, Image, Linking, Pressable, Style
 import { CameraView, type CameraType, type FlashMode, useMicrophonePermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { CameraPicker } from '../components/CameraPicker';
+import { LiveLookPreview } from '../components/LiveLookPreview';
+import { previewCaption, type LivePreviewStatus } from '../look/livePreview';
 import { Icon, IconButton, Notice, theme, ui, useScreenInsets } from '../components/ui';
 import { useLayoutHeight, useLayoutWidth } from '../components/DeviceFrame';
 import { getLook, type FilterId } from '../filters';
@@ -60,6 +62,9 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
   const [info, setInfo] = useState(false);
   const [chooseLook, setChooseLook] = useState(false);
   const [space, setSpace] = useState(360);
+  const [previewStatus, setPreviewStatus] = useState<LivePreviewStatus>('loading');
+  const [originalPreview, setOriginalPreview] = useState(false);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
   const busy = recording || capturing || countdown !== null;
   const look = getLook(camera);
   const aspect = mode === 'photo' ? 4 / 3 : 16 / 9;
@@ -175,7 +180,7 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
       {compact && <IconButton icon="options-outline" label="Camera settings" onPress={onSettings} disabled={busy} />}
     </View>
     <View style={s.finderSpace} onLayout={e => setSpace(Math.max(1, e.nativeEvent.layout.height - 8))}>
-      <View style={[s.finder, { width: vfWidth, height: vfWidth * aspect }]}
+      <View collapsable={false} style={[s.finder, { width: vfWidth, height: vfWidth * aspect }]}
         onTouchMove={e => {
           const touches = e.nativeEvent.touches;
           if (touches.length < 2 || capturing) { pinch.current = null; return; }
@@ -188,6 +193,8 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
           enableTorch={mode === 'video' && flashMode === 'on' && facing === 'back'} mute={!mic?.granted} zoom={zoom}
           selectedLens={lens} videoQuality="720p" autofocus="on" animateShutter={false}
           onCameraReady={() => { void cameraReady(); }} onMountError={e => setError(e.message)} />}
+        {foreground && ready && !originalPreview && camera !== 'auto' && camera !== 'original' && <LiveLookPreview
+          key={facing + mode + (lens ?? '') + previewAttempt} camera={camera} mirrored={facing === 'front'} onStatus={setPreviewStatus} />}
         {!ready && <View style={s.loading}><ActivityIndicator color={theme.accent} /><Text style={s.hudText}>Starting camera…</Text></View>}
         {grid && <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           {[1, 2].map(i => <React.Fragment key={i}><View style={[s.gridV, { left: (i * 100 / 3 + '%') as '33%' }]} /><View style={[s.gridH, { top: (i * 100 / 3 + '%') as '33%' }]} /></React.Fragment>)}
@@ -212,7 +219,20 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     {info && !compact && <View style={s.info}><Text style={ui.body}>{look.description}</Text><Text style={s.infoBest}>{look.bestFor}</Text></View>}
     {!compact && <CameraPicker active={camera} showAuto={cloudEnabled && mode === 'photo'} showOriginal disabled={busy}
       onSelect={id => { setCamera(id); onCameraChange(id); buzz(); }} />}
-    <Text style={s.caption}>Look applied after {mode === 'photo' ? 'capture' : 'recording'}</Text>
+    <View style={s.previewRow}>
+      <Text style={s.caption}>{previewCaption(camera, mode, originalPreview, previewStatus)}</Text>
+      {camera !== 'original' && camera !== 'auto' && <Pressable accessibilityRole="button"
+        accessibilityLabel={originalPreview ? 'Show camera look' : previewStatus === 'unavailable' ? 'Retry live colour preview' : 'Show original preview'}
+        accessibilityState={{ selected: !originalPreview && previewStatus === 'live' }}
+        onPress={() => {
+          if (!originalPreview && previewStatus === 'unavailable') { setPreviewStatus('loading'); setPreviewAttempt(v => v + 1); }
+          else { setOriginalPreview(v => !v); setPreviewStatus('loading'); }
+          buzz();
+        }} style={s.previewToggle}>
+        <Icon name={originalPreview ? 'eye-off-outline' : previewStatus === 'unavailable' ? 'refresh-outline' : 'eye-outline'} size={16} color={theme.accent} />
+        <Text style={s.previewLabel}>{originalPreview ? 'ORIGINAL' : previewStatus === 'unavailable' ? 'RETRY' : 'LOOK'}</Text>
+      </Pressable>}
+    </View>
     <View style={s.modeRow}>
       {(['photo', 'video'] as const).map(value => <Pressable key={value} disabled={busy} accessibilityRole="button"
         accessibilityState={{ selected: mode === value, disabled: busy }} onPress={() => { void changeMode(value); }} style={s.modeButton}>
@@ -265,7 +285,10 @@ const s = StyleSheet.create({
   lookSummary: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 18 },
   lookName: { fontSize: 12, color: theme.text, fontWeight: '500' },
   info: { paddingHorizontal: 22, paddingBottom: 8 }, infoBest: { color: theme.accent, fontSize: 11, marginTop: 3 },
-  caption: { color: theme.dim, fontSize: 10, textAlign: 'center', marginBottom: 2 },
+  previewRow: { minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  caption: { color: theme.muted, fontSize: 10, flexShrink: 1 },
+  previewToggle: { minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  previewLabel: { color: theme.accent, fontSize: 9, fontWeight: '600', letterSpacing: 0.7 },
   modeRow: { flexDirection: 'row', alignSelf: 'center', gap: 18 },
   modeButton: { minWidth: 65, minHeight: 44, justifyContent: 'center', alignItems: 'center', gap: 5 },
   modeText: { color: theme.muted, fontSize: 11, letterSpacing: 1.5, fontWeight: '700' }, modeDot: { width: 4, height: 4, borderRadius: 2 },

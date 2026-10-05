@@ -26,6 +26,11 @@ private enum VideoLookError: LocalizedError {
 public class VibeCamVideoModule: Module {
   public func definition() -> ModuleDefinition {
     Name("VibeCamVideo")
+    Constants(["hasLiveColourPreview": true])
+    View(LiveColourView.self) {
+      Events("onStatus")
+      Prop("cubeBase64") { (view: LiveColourView, cube: String) in view.cubeBase64 = cube }
+    }
 
     // The full-resolution camera file and the same 17-point colour cube used by photos
     // remain on device. AVFoundation also carries the original audio track into the MP4.
@@ -40,18 +45,10 @@ public class VibeCamVideoModule: Module {
         if cameraId == "original" {
           cube = nil
         } else {
-          guard let rgb = Data(base64Encoded: cubeBase64), rgb.count == 17 * 17 * 17 * 3 else {
+          guard let data = LookCube.decode(cubeBase64) else {
             throw VideoLookError.invalidLook
           }
-          var values = [Float32]()
-          values.reserveCapacity(17 * 17 * 17 * 4)
-          for i in stride(from: 0, to: rgb.count, by: 3) {
-            values.append(Float32(rgb[i]) / 255)
-            values.append(Float32(rgb[i + 1]) / 255)
-            values.append(Float32(rgb[i + 2]) / 255)
-            values.append(1)
-          }
-          cube = values.withUnsafeBytes { Data($0) }
+          cube = data
         }
 
         if cube == nil {
@@ -65,21 +62,18 @@ public class VibeCamVideoModule: Module {
               exporter.supportedFileTypes.contains(.mp4) else { throw VideoLookError.exportUnavailable }
 
         let cubeData = cube!
-        let colourSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let colourContext = CIContext(options: LookCube.contextOptions)
         exporter.videoComposition = AVVideoComposition(asset: asset, applyingCIFiltersWithHandler: { request in
-          guard let filter = CIFilter(name: "CIColorCubeWithColorSpace") else {
+          guard let filter = LookCube.filter(cubeData) else {
             request.finish(with: VideoLookError.invalidLook)
             return
           }
           filter.setValue(request.sourceImage, forKey: kCIInputImageKey)
-          filter.setValue(17, forKey: "inputCubeDimension")
-          filter.setValue(cubeData, forKey: "inputCubeData")
-          filter.setValue(colourSpace, forKey: "inputColorSpace")
           guard let frame = filter.outputImage else {
             request.finish(with: VideoLookError.invalidLook)
             return
           }
-          request.finish(with: frame.cropped(to: request.sourceImage.extent), context: nil)
+          request.finish(with: frame.cropped(to: request.sourceImage.extent), context: colourContext)
         })
         exporter.outputURL = output
         exporter.outputFileType = .mp4

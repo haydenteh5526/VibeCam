@@ -57,6 +57,7 @@ function loadTexture(gl: ExpoWebGLRenderingContext, asset: TextureSource, smooth
 export type RenderOptions = { camera: string; characterStrength: number; seed: number; recipe?: PhotoRecipe; takenAt?: number };
 export type PhotoRenderer = {
   draw: (width: number, height: number, opts: RenderOptions, target?: WebGLFramebuffer | null) => void;
+  updatePhoto: (photo: TextureSource) => void;
   dispose: () => void;
 };
 
@@ -103,6 +104,12 @@ export function createPhotoRenderer(
 
   let disposed = false;
   return {
+    updatePhoto(source) {
+      if (disposed || gl.isContextLost()) throw new Error('Photo graphics context is unavailable');
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, imageTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
+    },
     draw(drawWidth, drawHeight, opts, target = null) {
       if (disposed) throw new Error('Photo preview has closed');
       // WebGL reports CONTEXT_LOST only once through getError(). Later no-op draws
