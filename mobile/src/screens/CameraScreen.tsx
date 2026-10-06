@@ -16,6 +16,7 @@ type Props = {
   onCaptureVideo: (uri: string, camera: FilterId | 'auto', durationMs: number) => void | Promise<void>;
   videoAvailable: boolean; onGallery: () => void; onSettings: () => void;
   onCameraChange: (camera: FilterId | 'auto') => void;
+  onVideoSoundChange: (enabled: boolean) => void;
   lastThumb: string | null; backendReady: boolean; cloudEnabled: boolean; settings: Settings;
   appError?: string; onDismissError: () => void;
 };
@@ -31,7 +32,7 @@ function lensOptions(names: string[]): Lens[] {
   }).sort((a, b) => a.order - b.order);
 }
 export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGallery, onSettings,
-  onCameraChange, lastThumb, cloudEnabled, settings, appError, onDismissError }: Props) {
+  onCameraChange, onVideoSoundChange, lastThumb, cloudEnabled, settings, appError, onDismissError }: Props) {
   const insets = useScreenInsets();
   const width = useLayoutWidth();
   const compact = useLayoutHeight() < 760;
@@ -42,12 +43,19 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
   const recordTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pinch = useRef<number | null>(null);
   const flash = useRef(new Animated.Value(0)).current;
-  const [ready, setReady] = useState(false);
+  const [readyKey, setReadyKey] = useState<string | null>(null);
+  const [cameraGeneration, setCameraGeneration] = useState(0);
   const [foreground, setForeground] = useState(AppState.currentState !== 'background');
   const [facing, setFacing] = useState<CameraType>('back');
   const [mode, setMode] = useState<'photo' | 'video'>('photo');
-  const [mic, requestMic] = useMicrophonePermissions();
+  const [mic, requestMic, refreshMic] = useMicrophonePermissions();
+  const micRequest = useRef(false);
+  const [audioPending, setAudioPending] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [recordingSound, setRecordingSound] = useState(false);
+  const recordingRef = useRef(false);
+  const stopping = useRef(false);
+  const [finishing, setFinishing] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [capturing, setCapturing] = useState(false);
   const [flashMode, setFlashMode] = useState<FlashMode>('auto');
@@ -65,7 +73,13 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
   const [previewStatus, setPreviewStatus] = useState<LivePreviewStatus>('loading');
   const [originalPreview, setOriginalPreview] = useState(false);
   const [previewAttempt, setPreviewAttempt] = useState(0);
-  const busy = recording || capturing || countdown !== null;
+  const busy = recording || capturing || countdown !== null || audioPending;
+  // A permission refresh must not replace the camera halfway through a clip.
+  const soundOn = recording ? recordingSound : settings.videoSound && mic?.granted === true;
+  const cameraKey = `${cameraGeneration}:${facing}:${mode}:${mode === 'video' && soundOn ? 'sound' : 'silent'}`;
+  const activeCameraKey = useRef(cameraKey);
+  activeCameraKey.current = cameraKey;
+  const ready = readyKey === cameraKey;
   const look = getLook(camera);
   const aspect = mode === 'photo' ? 4 / 3 : 16 / 9;
   const vfWidth = Math.max(1, Math.min(width - 28, space / aspect));
@@ -76,6 +90,14 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     if (countdownTimer.current) clearInterval(countdownTimer.current);
     countdownTimer.current = null;
     if (mounted.current) setCountdown(null);
+  }, []);
+  const stopRecording = useCallback(() => {
+    if (!recordingRef.current || stopping.current) return;
+    stopping.current = true;
+    if (recordTimer.current) clearInterval(recordTimer.current);
+    recordTimer.current = null;
+    if (mounted.current) setFinishing(true);
+    cam.current?.stopRecording();
   }, []);
   const chooseCamera = (id: FilterId | 'auto') => {
     if (id !== camera || originalPreview) setPreviewStatus('loading');
@@ -88,25 +110,29 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
       const active = state === 'active';
       setForeground(active);
       if (!active) {
-        setReady(false); cancelTimer();
-        if (lock.current) cam.current?.stopRecording();
+        setCameraGeneration(n => n + 1);
+        setReadyKey(null); cancelTimer(); stopRecording();
+      } else {
+        // Permissions can change in iOS Settings while this screen is suspended.
+        void refreshMic().catch(() => {});
       }
     });
     return () => {
       mounted.current = false; cancelTimer(); sub.remove();
       if (recordTimer.current) clearInterval(recordTimer.current);
-      if (lock.current) cam.current?.stopRecording();
+      stopRecording();
     };
-  }, [cancelTimer]);
-  const cameraReady = async () => {
+  }, [cancelTimer, refreshMic, stopRecording]);
+  const cameraReady = async (key: string) => {
+    if (!mounted.current || activeCameraKey.current !== key) return;
     const instance = cam.current;
-    setReady(true);
+    setReadyKey(key);
     try {
       const options = lensOptions((await instance?.getAvailableLensesAsync()) ?? []);
-      if (!mounted.current || cam.current !== instance) return;
+      if (!mounted.current || cam.current !== instance || activeCameraKey.current !== key) return;
       setLenses(options);
       setLens(previous => previous ?? options.find(l => l.label === 'Wide')?.name);
-    } catch { if (mounted.current && cam.current === instance) setLenses([]); }
+    } catch { if (mounted.current && cam.current === instance && activeCameraKey.current === key) setLenses([]); }
   };
   const capture = async () => {
     if (!cam.current || !ready || lock.current) return;
@@ -121,24 +147,29 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     finally { lock.current = false; if (mounted.current) setCapturing(false); }
   };
   const record = async () => {
-    if (!cam.current || !ready || lock.current || !videoAvailable) return;
-    lock.current = true; setRecording(true); setSeconds(0); setError(''); buzz();
+    if (!cam.current || !ready || !foreground || lock.current || micRequest.current || !videoAvailable) return;
+    lock.current = true; setRecordingSound(soundOn); setRecording(true); setSeconds(0); setError(''); buzz();
+    recordingRef.current = true; stopping.current = false; setFinishing(false);
     const started = Date.now();
     recordTimer.current = setInterval(() => setSeconds(Math.min(15, Math.floor((Date.now() - started) / 1000))), 200);
     try {
       const clip = await cam.current.recordAsync({ maxDuration: 15 });
+      recordingRef.current = false;
+      if (recordTimer.current) clearInterval(recordTimer.current);
+      recordTimer.current = null;
+      if (mounted.current) setFinishing(true);
       if (!clip?.uri) throw new Error('No clip was recorded. Please try again.');
       await onCaptureVideo(clip.uri, camera, Math.min(15000, Date.now() - started));
     } catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : 'Recording failed.'); }
     finally {
       if (recordTimer.current) clearInterval(recordTimer.current);
-      recordTimer.current = null; lock.current = false;
-      if (mounted.current) setRecording(false);
+      recordTimer.current = null; lock.current = false; recordingRef.current = false; stopping.current = false;
+      if (mounted.current) { setRecording(false); setFinishing(false); }
     }
   };
   const shutter = () => {
     if (countdownTimer.current) { cancelTimer(); return; }
-    if (mode === 'video') { if (recording) cam.current?.stopRecording(); else void record(); return; }
+    if (mode === 'video') { if (recordingRef.current) stopRecording(); else void record(); return; }
     if (!ready || lock.current) return;
     if (!timer) { void capture(); return; }
     setCountdown(timer); let left = timer;
@@ -148,19 +179,34 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
       else { setCountdown(left); buzz(); }
     }, 1000);
   };
-  const changeMode = async (next: 'photo' | 'video') => {
-    if (busy || next === mode) return;
+  const toggleSound = async () => {
+    if (busy || lock.current || micRequest.current || mode !== 'video') return;
+    setError(''); buzz();
+    if (soundOn || mic?.granted) { onVideoSoundChange(!soundOn); return; }
+    micRequest.current = true; setAudioPending(true);
+    try {
+      if (mic?.canAskAgain === false) {
+        // Remember this explicit request so granting access in Settings enables sound.
+        onVideoSoundChange(true);
+        await Linking.openSettings();
+      } else {
+        const result = await requestMic();
+        if (!mounted.current) return;
+        onVideoSoundChange(result.granted);
+        if (!result.granted) setError('Microphone access is off. You can still record silent clips. Tap Sound to enable audio in Settings.');
+      }
+    } catch { if (mounted.current) setError('Could not enable the microphone. You can still record silently and try Sound again.'); }
+    finally { micRequest.current = false; if (mounted.current) setAudioPending(false); }
+  };
+  const changeMode = (next: 'photo' | 'video') => {
+    if (busy || lock.current || micRequest.current || next === mode) return;
     if (next === 'video' && !videoAvailable) {
       setError('Video is available in the installed iPhone app. You can keep shooting photos here.'); return;
     }
-    try {
-      setError('');
-      if (next === 'video' && !mic?.granted && mic?.canAskAgain !== false) await requestMic();
-      if (!mounted.current) return;
-      setReady(false); setMode(next); setFlashMode(next === 'video' ? 'off' : 'auto'); setInfo(false);
-      if (camera === 'auto' && next === 'video') { setCamera('g7x'); onCameraChange('g7x'); }
-      buzz();
-    } catch { setError('Could not change camera mode. Please try again.'); }
+    setError('');
+    setReadyKey(null); setMode(next); setFlashMode(next === 'video' ? 'off' : 'auto'); setInfo(false);
+    if (camera === 'auto' && next === 'video') { setCamera('g7x'); onCameraChange('g7x'); }
+    buzz();
   };
   return <View style={[ui.screen, { paddingTop: insets.top, paddingBottom: Math.max(8, insets.bottom) }]}>
     {!compact && <View style={s.header}>
@@ -176,9 +222,11 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
       {mode === 'photo' ? <Pressable accessibilityRole="button" accessibilityLabel={'Timer ' + (timer ? timer + ' seconds' : 'off')} disabled={busy}
         onPress={() => { buzz(); setTimer(v => v === 0 ? 3 : v === 3 ? 10 : 0); }} style={s.control}>
         <Icon name="timer-outline" size={18} color={timer ? theme.accent : theme.muted} /><Text style={s.controlText}>{timer ? timer + 's' : 'OFF'}</Text>
-      </Pressable> : <Pressable accessibilityRole="button" accessibilityLabel={mic?.granted ? 'Microphone enabled' : 'Enable microphone'} disabled={busy}
-        onPress={() => { void (mic?.canAskAgain === false ? Linking.openSettings() : requestMic()).catch(() => setError('Enable microphone access in Settings.')); }} style={s.control}>
-        <Icon name={mic?.granted ? 'mic-outline' : 'mic-off-outline'} size={18} /><Text style={s.controlText}>{mic?.granted ? 'SOUND' : 'SILENT'}</Text>
+      </Pressable> : <Pressable accessibilityRole="button" accessibilityLabel={soundOn ? 'Mute video sound' : mic?.canAskAgain === false && !mic.granted ? 'Open Settings to enable video sound' : 'Enable video sound'}
+        accessibilityState={{ selected: soundOn, disabled: busy, busy: audioPending }} disabled={busy}
+        onPress={() => { void toggleSound(); }} style={[s.control, busy && ui.disabled]}>
+        {audioPending ? <ActivityIndicator size="small" color={theme.accent} /> : <Icon name={soundOn ? 'mic-outline' : 'mic-off-outline'} size={18} color={soundOn ? theme.accent : theme.muted} />}
+        <Text style={[s.controlText, soundOn && { color: theme.accent }]}>SOUND {soundOn ? 'ON' : 'OFF'}</Text>
       </Pressable>}
       <Pressable accessibilityRole="button" accessibilityLabel="Composition grid" accessibilityState={{ selected: grid }} onPress={() => { buzz(); setGrid(v => !v); }} style={s.control}>
         <Icon name="grid-outline" size={18} color={grid ? theme.accent : theme.muted} /><Text style={s.controlText}>GRID</Text>
@@ -194,18 +242,18 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
           if (pinch.current !== null) setZoom(v => Math.min(1, Math.max(0, v + (distance - pinch.current!) * 0.003)));
           pinch.current = distance;
         }} onTouchEnd={() => { pinch.current = null; }}>
-        {foreground && <CameraView key={facing + mode} ref={cam} style={StyleSheet.absoluteFill} facing={facing}
+        {foreground && <CameraView key={cameraKey} ref={cam} style={StyleSheet.absoluteFill} facing={facing}
           mode={mode === 'photo' ? 'picture' : 'video'} flash={mode === 'photo' ? flashMode : 'off'}
-          enableTorch={mode === 'video' && flashMode === 'on' && facing === 'back'} mute={!mic?.granted} zoom={zoom}
+          enableTorch={mode === 'video' && flashMode === 'on' && facing === 'back'} mute={mode !== 'video' || !soundOn} zoom={zoom}
           selectedLens={lens} videoQuality="720p" autofocus="on" animateShutter={false}
-          onCameraReady={() => { void cameraReady(); }} onMountError={e => setError(e.message)} />}
+          onCameraReady={() => { void cameraReady(cameraKey); }} onMountError={e => setError(e.message)} />}
         {foreground && ready && !originalPreview && camera !== 'auto' && camera !== 'original' && <LiveLookPreview
-          key={facing + mode + (lens ?? '') + previewAttempt} camera={camera} mirrored={facing === 'front'} onStatus={setPreviewStatus} />}
+          key={cameraKey + (lens ?? '') + previewAttempt} camera={camera} mirrored={facing === 'front'} onStatus={setPreviewStatus} />}
         {!ready && <View style={s.loading}><ActivityIndicator color={theme.accent} /><Text style={s.hudText}>Starting camera…</Text></View>}
         {grid && <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           {[1, 2].map(i => <React.Fragment key={i}><View style={[s.gridV, { left: (i * 100 / 3 + '%') as '33%' }]} /><View style={[s.gridH, { top: (i * 100 / 3 + '%') as '33%' }]} /></React.Fragment>)}
         </View>}
-        <View pointerEvents="none" style={s.hud}><Text style={s.hudText}>{recording ? '● REC  00:' + String(seconds).padStart(2, '0') : mode === 'photo' ? 'PHOTO  3:4' : 'VIDEO  9:16'}</Text><Text style={s.hudText}>{mode === 'video' ? '720p · 15s' : 'JPEG'}</Text></View>
+        <View pointerEvents="none" style={s.hud}><Text style={s.hudText}>{finishing ? 'FINISHING…' : recording ? '● REC  00:' + String(seconds).padStart(2, '0') : mode === 'photo' ? 'PHOTO  3:4' : 'VIDEO  9:16'}</Text><Text style={s.hudText}>{mode === 'video' ? (soundOn ? 'SOUND ON' : 'SILENT') : 'JPEG'}</Text></View>
         {countdown !== null && <View pointerEvents="none" style={s.countdown}><Text style={s.countdownText}>{countdown}</Text><Text style={s.hudText}>Tap shutter to cancel</Text></View>}
         {!recording && <View style={s.lensRow}>
           {lenses.length > 1 ? lenses.map(item => <Pressable key={item.name} disabled={busy} accessibilityRole="button"
@@ -217,6 +265,7 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#fff', opacity: flash }]} />
       </View>
     </View>
+    {mode === 'video' && <Text accessibilityLiveRegion="polite" style={s.soundHint}>{finishing ? 'Finishing your clip…' : recording ? 'Tap shutter to stop' : audioPending ? 'Waiting for microphone access…' : soundOn ? '720p · Up to 15s · Sound on' : '720p · Up to 15s · Silent — tap Sound for audio'}</Text>}
     {error || appError ? <View style={s.error}><View style={{ flex: 1 }}><Notice text={error || appError || ''} error /></View><IconButton icon="close" label="Dismiss camera message" onPress={() => { setError(''); onDismissError(); }} /></View> : null}
     <Pressable accessibilityRole="button" accessibilityLabel={(compact ? 'Choose camera look, ' : 'About ') + look.name} accessibilityState={{ expanded: compact ? chooseLook : info }} disabled={busy}
       onPress={() => compact ? setChooseLook(true) : setInfo(v => !v)} style={s.lookSummary}>
@@ -249,12 +298,12 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
       <Pressable accessibilityRole="button" accessibilityLabel="Open Film Roll" disabled={busy} onPress={onGallery} style={s.roll}>
         {lastThumb ? <Image source={{ uri: lastThumb }} style={s.thumb} /> : <Icon name="images-outline" size={24} />}
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel={countdown !== null ? 'Cancel timer' : mode === 'photo' ? 'Take photo' : recording ? 'Stop recording' : 'Record video'}
-        disabled={!ready || capturing} onPress={shutter} style={({ pressed }) => [s.shutter, (!ready || capturing) && ui.disabled, pressed && { transform: [{ scale: 0.94 }] }]}>
-        {capturing ? <ActivityIndicator color={theme.accent} /> : <View style={[s.shutterInner, mode === 'video' && { backgroundColor: '#ed7465' }, recording && s.stop]} />}
+      <Pressable accessibilityRole="button" accessibilityLabel={finishing ? 'Finishing clip' : countdown !== null ? 'Cancel timer' : mode === 'photo' ? 'Take photo' : recording ? 'Stop recording' : 'Record video'}
+        disabled={!ready || capturing || audioPending || finishing} onPress={shutter} style={({ pressed }) => [s.shutter, (!ready || capturing || audioPending || finishing) && ui.disabled, pressed && { transform: [{ scale: 0.94 }] }]}>
+        {capturing || finishing ? <ActivityIndicator color={theme.accent} /> : <View style={[s.shutterInner, mode === 'video' && { backgroundColor: '#ed7465' }, recording && s.stop]} />}
       </Pressable>
       <IconButton icon="camera-reverse-outline" label="Switch front and back cameras" disabled={busy} onPress={() => {
-        buzz(); setReady(false); setLens(undefined); setLenses([]); setZoom(0); setFacing(v => v === 'back' ? 'front' : 'back');
+        buzz(); setReadyKey(null); setLens(undefined); setLenses([]); setZoom(0); setFacing(v => v === 'back' ? 'front' : 'back');
       }} style={s.flip} />
     </View>
     {chooseLook && compact && <View style={s.lookModal} accessibilityViewIsModal>
@@ -273,6 +322,7 @@ const s = StyleSheet.create({
   controls: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20 },
   control: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12 },
   controlText: { fontSize: 10, letterSpacing: 1, color: theme.muted, fontWeight: '600' },
+  soundHint: { color: theme.muted, fontSize: 11, textAlign: 'center', paddingHorizontal: 16, paddingVertical: 4 },
   finderSpace: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 100 },
   finder: { backgroundColor: '#20231d', borderRadius: 18, overflow: 'hidden' },
   loading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 12 },

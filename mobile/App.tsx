@@ -311,6 +311,7 @@ export default function App() {
     return <CameraScreen onCapture={onCapture} onCaptureVideo={onCaptureVideo} videoAvailable={hasVideoLooks()}
       appError={error} onDismissError={() => setError('')}
       onGallery={() => setScreen('roll')} onSettings={() => openSettings('camera')} onCameraChange={defaultCamera => updateSettings({ defaultCamera })}
+      onVideoSoundChange={videoSound => updateSettings({ videoSound })}
       lastThumb={roll[0]?.mediaType === 'video' ? roll[0].thumbnailUri ?? null : roll[0]?.uri ?? null}
       backendReady={backend} settings={effectiveSettings} cloudEnabled={CLOUD_FEATURES_ENABLED} />;
   };

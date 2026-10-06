@@ -28,6 +28,8 @@ export type Settings = {
   haptics: boolean;
   /** Show the grid overlay by default. */
   grid: boolean;
+  /** Remember the video sound choice; microphone permission is checked separately. */
+  videoSound: boolean;
   /**
    * Develop on the device instead of waiting for the backend.
    *
@@ -49,6 +51,7 @@ export const DEFAULT_SETTINGS: Settings = {
   saveOriginal: false,
   haptics: true,
   grid: false,
+  videoSound: true,
   onDeviceLook: true,
 };
 
@@ -87,6 +90,7 @@ export function normalize(raw: unknown): Settings {
     saveOriginal: bool(r.saveOriginal, DEFAULT_SETTINGS.saveOriginal),
     haptics: bool(r.haptics, DEFAULT_SETTINGS.haptics),
     grid: bool(r.grid, DEFAULT_SETTINGS.grid),
+    videoSound: bool(r.videoSound, DEFAULT_SETTINGS.videoSound),
     onDeviceLook: bool(r.onDeviceLook, DEFAULT_SETTINGS.onDeviceLook),
   };
 }

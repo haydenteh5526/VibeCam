@@ -22,6 +22,7 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
   survives as tag archive/visioncamera-manual-controls-2026-07. Stale branches were removed.
 - PR #27 merged the refined camera, editor and Film Roll, plus corrected LUT axes.
 - PR #28 merged interactive photo editing previews. PR #29 adds live camera colour.
+- PR #30 merged Xcode 26.2 Release checks, EAS build numbering and Windows build instructions.
 - docs/RELEASE_READINESS.md records verification and the remaining physical iPhone gates.
 
 ## Architecture
@@ -55,6 +56,11 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
   are retained before the index is written; only unreferenced owned files are removed afterward.
   Favourites, saved status and recipes survive restart. Bulk deletion commits once.
 - src/services/storage.ts uses app documents on native and IndexedDB on web.
+- CameraScreen remembers settings.videoSound separately from microphone authorization.
+  Video mode is silent until authorized and enabled; Sound is the explicit permission
+  entry point. Foreground refreshes permission; camera identity includes audio and a
+  lifecycle generation so readiness cannot carry over to a replacement camera. Audio
+  stays fixed while recording. Stop shows finishing and locks controls until completion.
 - backend/: optional FastAPI/Python grading and cloud development. Not needed for v1.
   Reference statistics from unrelated sample scenes are not paired calibration data.
 
@@ -63,6 +69,8 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 Run npm run typecheck and npm test in mobile; run .venv/Scripts/python.exe -m pytest
 from backend (use the full path to the interpreter).
 npm run test:gpu serves the real shader check on localhost:8082; press Run GPU check.
+npm run test:camera serves a separate CameraScreen interaction harness on 127.0.0.1:8083;
+press Run checks. Device/audio responses are simulated; no real video or Film Roll writes.
 npx expo export --platform all checks bundles. npx expo-doctor checks dependencies.
 GitHub macOS CI checks the actual Core Image LUT against 4,096 colours per table and
 compiles an unsigned iPhone Release build with Xcode 26.2/iOS 26 SDK and an embedded
