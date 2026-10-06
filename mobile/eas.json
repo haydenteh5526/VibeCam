@@ -1,28 +1,35 @@
 {
   "cli": {
-    "version": ">= 9.0.0"
+    "version": ">= 24.11.0",
+    "appVersionSource": "remote"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
+    "base": {
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.2"
+      },
       "env": {
         "EXPO_PUBLIC_ENABLE_CLOUD_FEATURES": "false",
         "EXPO_PUBLIC_API_BASE_URL": "https://vibecam-backend.onrender.com"
       }
+    },
+    "development": {
+      "extends": "base",
+      "environment": "development",
+      "developmentClient": true,
+      "distribution": "internal"
     },
     "preview": {
+      "extends": "base",
+      "environment": "preview",
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_ENABLE_CLOUD_FEATURES": "false",
-        "EXPO_PUBLIC_API_BASE_URL": "https://vibecam-backend.onrender.com"
-      }
+      "autoIncrement": true
     },
     "production": {
-      "env": {
-        "EXPO_PUBLIC_ENABLE_CLOUD_FEATURES": "false",
-        "EXPO_PUBLIC_API_BASE_URL": "https://vibecam-backend.onrender.com"
-      }
+      "extends": "base",
+      "environment": "production",
+      "distribution": "store",
+      "autoIncrement": true
     }
   }
 }

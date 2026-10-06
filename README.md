@@ -22,6 +22,8 @@ explicitly keep this disabled.
 - **Pocket Camera Emulation** — Six compact-camera-inspired colour looks: Canon G7X III, Sony RX100, Ricoh GR III, Fuji X100, Y2K CCD digicam, and Canon PowerShot
 - **Photo Character** — Offline highlight, vignette and sensor grain controls; video uses the selected camera's colour look
 - **On-device Developing** — Baked 3D LUTs render photos on the GPU and video during local export
+- **Live Colour** — Preview the selected camera's colour while shooting, with an Original/Look comparison. Custom iPhone builds on iOS 16+ and web support this; texture and date finishing are added after capture.
+- **Interactive Editing** — Preview camera, strength, exposure, warmth, texture and date changes before applying a full-resolution edit; discard returns to the saved version.
 - **Film Roll** — Photos and clips stay on the iPhone with their originals until you delete them; tap an item to try another look
 - **Durable Media** — Originals and edits survive cache eviction; preview, saving and sharing use the same committed media
 - **Photo Import** — Develop JPEG and PNG photos from Files, including when camera access is off
@@ -38,19 +40,40 @@ explicitly keep this disabled.
 | Mobile | Expo SDK 54, React Native 0.81, TypeScript |
 | Backend | Python 3.11, FastAPI, Uvicorn, Pydantic v2 |
 | Camera | expo-camera |
-| Upload | expo-file-system (chunked streaming) |
-| Storage | SQLite (sessions), disk (payloads) |
-| Deploy | Render (backend), EAS Build (mobile) |
+| Photo/video looks | Expo GL, local Core Image/Metal/AVFoundation module |
+| App storage | App documents on iPhone; IndexedDB on web |
+| Build | EAS Build on cloud Macs, including from Windows |
+| Optional backend | Render; SQLite upload sessions and disk payloads |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 20+
-- Python 3.11+
-- Android Studio or Xcode (for device/emulator testing)
+- Node.js 20.19+ and npm (the Expo SDK 54 minimum).
+- For a signed iPhone build: an Expo account with project access, an active Apple
+  Developer membership and a registered iPhone. No local Mac is needed.
+- Python 3.11+ is only needed for optional backend development.
 
-### Backend
+### Start on a PC
+
+```powershell
+cd mobile
+npm ci
+npm run web
+```
+
+Open `http://localhost:8081`. Import a JPEG/PNG from Files to try the looks when the
+PC has no camera. Photos are developed locally and Save downloads the edited image.
+Web cannot validate native video, microphone, Photos permissions or camera hardware.
+
+### Install on an iPhone
+
+Follow the [Windows-to-iPhone build guide](docs/DEPLOY.md) to sign in, register the
+phone and run `npm run build:iphone` from `mobile`. The preview build contains the
+native video/live-colour module and runs offline without a development server.
+Expo Go does not contain that module and is not the release test target.
+
+### Optional backend
 
 ```bash
 cd backend
@@ -62,16 +85,6 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Health check: `GET http://127.0.0.1:8000/health`
-
-### Mobile
-
-```bash
-cd mobile
-cp .env.example .env
-npm install
-npx expo prebuild
-npm run android  # or: npm run ios
-```
 
 ## Project Structure
 
@@ -137,10 +150,11 @@ Point-and-shoot signatures, off unless requested. All are deterministic: pass th
 | `X-Dust` | `0`–`1` | Dust specks and hair-thin scratches |
 | `X-Seed` | integer | Fixes the random pattern so re-develops match |
 
-### Accurate mode — match a real camera from samples
+### Experimental backend reference profiles
 
-The `X-Camera` looks above are hand-tuned approximations. For results grounded in
-a **real** camera, teach the app from straight-out-of-camera (SOOC) sample JPEGs:
+The camera looks are inspired interpretations, not measured hardware matches.
+The optional backend can derive reference statistics from straight-out-of-camera
+(SOOC) sample JPEGs:
 
 1. Collect SOOC JPEGs from the target camera (e.g. from sample galleries) and sort
    them into `backend/camera_samples/<camera>/<scene>/` (`skin`, `daylight`,
@@ -149,17 +163,14 @@ a **real** camera, teach the app from straight-out-of-camera (SOOC) sample JPEGs
 3. Build a profile: `python tools/build_profile.py g7x`
    → writes `backend/camera_profiles/g7x.json` (small derived stats — safe to commit; the images stay local/git-ignored).
 
-Once a profile exists, `POST /grade` with that `X-Camera` maps your photo toward the
-real camera's colour (per-channel mean/spread matching, deliberately not full
-covariance transport — see `CONTEXT.md` §7) and reports `X-Grade-Method: reference`.
+Once a profile exists, `POST /grade` with that `X-Camera` uses per-channel mean/spread
+matching and reports `X-Grade-Method: reference`.
 Without a profile it falls back to the parametric preset (`X-Grade-Method: preset`).
 
-Either way the result then passes through the **character layer** (`backend/character.py`),
-which adds what colour alone can't: highlight bloom/halation, lens vignette and corner
-softness, chromatic aberration, luminance-dependent sensor noise, and in-camera JPEG
-oversharpening. That physicality is what makes a shot read as "pocket camera" instead of
-"filter". Colour/tone plus character gets convincingly close; true optical traits
-(a 1-inch sensor's depth of field) can't be reproduced from a phone frame.
+The backend character layer adds optional texture and optical effects. Statistics
+from unrelated scenes do not establish camera fidelity and are not the offline
+app's rendering path. See [paired-shot calibration](docs/CAMERA_CALIBRATION.md)
+for the measurement needed before claiming a match to real cameras.
 
 ## Environment Variables
 
@@ -175,6 +186,7 @@ oversharpening. That physicality is what makes a shot read as "pocket camera" in
 
 | Variable | Description |
 |----------|-------------|
+| `EXPO_PUBLIC_ENABLE_CLOUD_FEATURES` | Defaults off. `true` opts into unfinished cloud development; EAS release profiles force it off |
 | `EXPO_PUBLIC_API_BASE_URL` | Backend API URL |
 | `EXPO_PUBLIC_API_KEY` | Must match the backend's `VIBECAM_API_KEY` (empty for local dev) |
 
@@ -218,15 +230,14 @@ verified behavior and the remaining steps before store submission.
 Blueprint defined in `render.yaml`. Push to deploy. Set `VIBECAM_API_KEY` in the
 Render dashboard (declared `sync: false`, so no value lives in the repo).
 
-Full walkthrough for deploying and running on a physical iPhone, including
-recommended iOS camera settings: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
+Physical iPhone build and installation instructions: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
 ### Mobile (EAS Build)
 
 ```bash
 cd mobile
-npx eas build -p ios --profile production
-npx eas build -p android --profile production
+npm run build:iphone          # signed internal preview, registered iPhones
+npm run build:iphone:store    # App Store/TestFlight binary; does not submit it
 ```
 
 ## Contributing

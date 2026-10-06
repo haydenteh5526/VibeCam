@@ -28,7 +28,7 @@ VibeCam develops photos and short videos on your iPhone with six distinct compac
 - Flash, timer, grid and camera switching on supported devices
 - No account or internet connection required
 
-Film Roll keeps your items until you delete them, subject to available device storage. Save copies to Photos before uninstalling VibeCam. Video looks apply each camera's colour treatment; photo texture, fine-tuning and date stamps do not apply to clips. The viewfinder is unprocessed; the selected look is applied after capture. The looks are artistic interpretations and do not reproduce another camera's optics or every aspect of its rendering. VibeCam is not affiliated with camera manufacturers.
+Film Roll keeps your items until you delete them, subject to available device storage. Save copies to Photos before uninstalling VibeCam. Video looks apply each camera's colour treatment; photo texture, fine-tuning and date stamps do not apply to clips. On supported iPhones running iOS 16+, the viewfinder previews camera colour with an Original/Look comparison; texture and date finishing are added after capture. The raw viewfinder remains available if live colour is unavailable. The looks are artistic interpretations and do not reproduce another camera's optics or every aspect of its rendering. VibeCam is not affiliated with camera manufacturers.
 
 ## Existing support details - verify before submission
 

@@ -1,225 +1,145 @@
-# Deploy & run on your iPhone
+# Build and test VibeCam on an iPhone
 
-Runbook for getting VibeCam onto a physical iPhone. Steps needing your accounts
-(Render, Apple ID) are marked **[you]**.
+The first release is offline. No backend, API key or app account is required to use
+it. Building and signing it requires developer accounts. These steps work from
+Windows because EAS builds on cloud Macs.
 
-For current validation results and required device checks, start with
-**[RELEASE_READINESS.md](RELEASE_READINESS.md)**. Originals and developed photos
-remain in Film Roll even when Photos permission is denied.
+## 1. Prepare the PC
 
-**First iPhone release: offline features only.** No backend or API key is needed.
-Skip sections 1–3 and go to the device/build instructions in section 4. The server
-instructions are for optional future cloud development; enable that explicitly with
-`EXPO_PUBLIC_ENABLE_CLOUD_FEATURES=true` in a development environment. All EAS
-profiles explicitly disable it for this release.
-
----
-
-## 1. Generate an API key
-
-The backend gate is off when `VIBECAM_API_KEY` is empty. Any internet-reachable
-deployment should set it, or strangers can spend your `/grade` CPU and fill your disk
-via `/uploads`.
+From the repository root:
 
 ```powershell
-python -c "import secrets; print(secrets.token_urlsafe(32))"
+cd mobile
+npm ci
+npm run check:release
 ```
 
-Keep the value handy — the backend and the app both need it. Don't commit it.
+The npm scripts use EAS CLI 24.11.0. `eas.json` pins Xcode 26.2 for iOS, including
+preview and production. Apple requires the iOS 26 SDK or later for uploads from
+April 28, 2026. The SDK used to build the app is separate from its minimum supported
+iOS version; live colour requires iOS 16+, while older supported iPhones retain the
+raw viewfinder. See [Apple's requirement](https://developer.apple.com/news/?id=ueeok6yw)
+and [Expo's build images](https://docs.expo.dev/build-reference/infrastructure/).
 
-## 2. Deploy the backend **[you]**
+## 2. Sign in and verify project access
 
-`render.yaml` is a ready Render blueprint (free plan, `rootDir: backend`, Python
-3.11.9, health check on `/health`).
-
-1. Render dashboard → **New → Blueprint** → pick the `VibeCam` repo.
-2. Confirm the deploy branch is **`main`** (the old `mvp` branch was deleted).
-3. When prompted for `VIBECAM_API_KEY`, paste the key from step 1
-   (it's declared `sync: false`, so it is never stored in the repo).
-4. Optional: add `GOOGLE_AI_API_KEY` if you want `/grade/vibe` and `/guide`.
-   The six camera looks do **not** need it — they run offline and deterministically.
-
-Verify once live (replace the host):
+Run these in an interactive terminal; keep passwords and verification codes there:
 
 ```powershell
-# public — should return {"status":"ok",...}
-curl.exe -s https://vibecam-backend.onrender.com/health
-
-# gated — should return 401
-curl.exe -s -o NUL -w "%{http_code}`n" https://vibecam-backend.onrender.com/cameras
-
-# with the key — should return 200 and the camera list
-curl.exe -s -H "X-API-Key: YOUR_KEY" https://vibecam-backend.onrender.com/cameras
+npm run eas -- login
+npm run eas -- whoami
+npm run eas -- project:info
 ```
 
-> Free-plan instances sleep when idle, so the first capture after a pause can take
-> ~30–60 s to wake. Nothing is broken — it's a cold start.
+The configured project belongs to `hayyyyy`, has ID
+`054f74da-a7ed-4340-84cb-eb5f257ae716`, and uses bundle ID `com.vibecam.app`.
+Use that Expo account or one granted access to its project. If project access fails,
+resolve access before building; do not create an unrelated project or replace the ID.
 
-## 3. Point the app at it
+An active Apple Developer Program membership and permission to manage signing for
+its team are required for the following physical-device cloud build. A free Apple
+ID alone does not support this EAS signing workflow. See
+[Expo's device build guide](https://docs.expo.dev/tutorial/eas/ios-development-build-for-devices/).
 
-`mobile/.env` (copy from `.env.example`):
-
-```
-EXPO_PUBLIC_API_BASE_URL=https://vibecam-backend.onrender.com
-EXPO_PUBLIC_API_KEY=<the same key>
-```
-
-`EXPO_PUBLIC_*` values are compiled into the bundle. That's fine here: the key stops
-random internet traffic, it isn't a secret from someone holding your build.
-
-## 4. Get it onto the iPhone **[you]**
-
-Every dependency is a first-party Expo module (no custom native code), so **Expo Go
-works** — which matters because `npx expo run:ios` needs macOS + Xcode and is not an
-option from Windows.
-
-### Fastest iteration: run it on the laptop (web)
-
-For UI and layout work, skip the phone entirely:
-
-```bash
-cd mobile
-npm run web        # serves on http://localhost:8081
-```
-
-Hot reload is instant and browser devtools work. What does and doesn't apply:
-
-| Works on web | Doesn't |
-|---|---|
-| Every screen, layout, navigation | Saving to the photo library (no such thing in a browser) |
-| Settings and durable film roll (IndexedDB) | Native haptics and the iOS share sheet |
-| Viewfinder via the laptop webcam | Native on-device developing — web uses the backend path |
-| Capture, backend grading, re-develop | |
-
-`expo-file-system` does not exist on web, so binary I/O and persistence route through
-`src/services/storage.ts`, which stores durable image data in IndexedDB in a browser.
-JPEG and PNG import from Files is available without camera access, and Save downloads
-the current edit on web.
-
-Treat web as a **development surface only**: verify looks and camera behaviour on the
-phone, because a laptop webcam is nothing like an iPhone sensor.
-
-### On the phone: Expo Go (no build, no Mac)
-
-```bash
-cd mobile
-npm install
-npm run go            # same Wi-Fi
-npm run go:tunnel     # phone on mobile data / different network
-```
-
-Install **Expo Go** from the App Store, then scan the QR code with the iPhone camera.
-
-> **The `--go` flag matters.** `expo-dev-client` is a dependency, so plain
-> `npx expo start` defaults to *development build* mode and prints a QR encoding
-> `exp+vibecam://expo-development-client/?url=…`. Expo Go cannot open that URL — you
-> need a custom dev build for it. The tell is `› Using development build` in the
-> output. Either use `--go` (as the scripts above do) or press **`s`** in the running
-> dev server to switch to Expo Go, which reprints the QR as `exp://…`.
-Phone and PC must be on the same Wi-Fi.
-
-#### Phone not on the same network (mobile data, guest Wi-Fi, office network)
-
-LAN mode serves the JS bundle from the laptop's private address (e.g.
-`192.168.0.237:8081`), which a phone on cellular cannot reach. Use tunnel mode:
-
-```bash
-npx expo start --tunnel
-```
-
-`@expo/ngrok` is already a pinned devDependency, so this runs without an install
-prompt. The bundle is relayed through a public URL, so the phone can be on mobile data
-or any other network. It's slower to load and hot-reload than LAN — prefer plain
-`npx expo start` when both devices share Wi-Fi.
-
-**Tunnels drop.** `Tunnel connection has been closed … related to intermittent
-connection issues between the dev server and ngrok` is common and usually not your
-fault. In order of effort:
-
-1. Restart the dev server (`Ctrl+C`, then `npm run go:tunnel`). Most drops clear.
-2. Check <https://status.ngrok.com/> for an actual outage.
-3. Add `-c` to clear the bundler cache if reloads then behave oddly:
-   `npx expo start --tunnel --go -c`
-4. If tunnels keep collapsing mid-session, the robust fix is to stop depending on the
-   dev server: put the phone on the same Wi-Fi and use `npm run go`, or build a
-   standalone app with EAS (below), which needs no dev server at all.
-
-Tunnel mode only covers the **dev server**. A backend on `http://<LAN-IP>:8000` is
-still unreachable from another network, so pair tunnel mode with the deployed Render
-URL in `EXPO_PUBLIC_API_BASE_URL` (it's on the public internet, so any connection
-works).
-
-#### If Expo Go won't connect on the same Wi-Fi
-
-- **Client isolation**: many routers, and most guest/hotel/office networks, block
-  device-to-device traffic. Same SSID, still no connection → use `--tunnel`.
-- **Windows Firewall** commonly blocks inbound `8081`. Allow Node through, or
-  use `--tunnel`.
-
-Caveats: Expo Go ignores `app.json`'s `infoPlist` / plugin config and uses its own
-permission strings, so the photo-library prompt will say *Expo Go* wants access.
-Saving still works. Nothing else in this app depends on custom native config.
-
-### For a standalone app: EAS cloud build
-
-Builds on Apple hardware in the cloud, so it works from Windows:
-
-```bash
-cd mobile
-npx eas-cli@latest build -p ios --profile preview   # install via the QR/link it prints
-```
-
-EAS builds for physical iPhones require an Apple Developer Program membership and
-device registration. A free Apple ID alone is insufficient for this cloud signing
-workflow. See [Expo's iOS device build guide](https://docs.expo.dev/tutorial/eas/ios-development-build-for-devices/).
-
-The `preview` profile embeds the app bundle and runs without Metro. The `development`
-profile is for a custom development client and still needs a development server.
-All profiles disable cloud access. The stored server URL is used only if you
-explicitly opt into future cloud development; it is never contacted by this release.
-
-## 5. Camera settings — what actually matters
-
-The app captures through **expo-camera (AVFoundation)**, not Apple's Camera app. The
-stock app's computational pipeline — Smart HDR, Deep Fusion, Photographic Styles — is
-part of *Apple's* app, so those Settings toggles largely do not affect what VibeCam
-captures. That works in our favour: a less-processed, flatter frame is better input
-for camera emulation.
-
-Notes for specific devices:
-
-- **iPhone 12 Pro Max** (and any pre-iPhone-13): **Photographic Styles doesn't exist**
-  on this hardware — it arrived with the iPhone 13. Nothing to disable.
-- **iPhone 13 and later**: Photographic Styles applies only to the stock Camera app,
-  so it shouldn't affect VibeCam either. Set it to Standard anyway if you also want
-  your normal photos neutral for comparison.
-- **Settings → Camera → Formats** likewise governs the stock app; expo-camera returns
-  a JPEG regardless.
-
-Exactly how much processing AVFoundation applies by default on a given iPhone is worth
-confirming on-device — shoot the same scene in VibeCam and the stock Camera app and
-compare. If VibeCam's frame looks flatter, that's expected and correct.
-
-## 6. What to check on device
-
-- [ ] Capture → graded photo appears (this exercises the `file://` path from PR #8)
-- [ ] Each of the six looks visibly differs on the same scene
-- [ ] `g7x`/`rx100`/`gr`/`x100` responses carry `X-Grade-Method: reference`
-- [ ] Skin tones on a portrait — the known weak spot (thin `skin` sample coverage)
-- [ ] Cold-start delay is tolerable
-
-Bring back anything that looks off and we can tune blend strength and scene
-thresholds per camera.
-
-## Local-only alternative
-
-To skip Render entirely, run the backend on your machine and use its LAN IP:
+## 3. Register the iPhone before building
 
 ```powershell
-cd backend
-uvicorn main:app --host 0.0.0.0 --port 8000
+npm run eas -- device:create
+npm run eas -- device:list
 ```
 
-Set `EXPO_PUBLIC_API_BASE_URL=http://<your-LAN-IP>:8000` and leave
-`EXPO_PUBLIC_API_KEY` empty (`--host 0.0.0.0` exposes it to your local network only).
-Phone and computer must share a Wi-Fi network.
+Choose website registration and open the resulting link in Safari **on the iPhone**.
+Follow the device registration instructions and confirm the phone appears in the
+list. Choose the intended Apple Developer team when prompted. EAS adds registered
+devices to the ad hoc provisioning profile during the build/signing process.
+
+## 4. Build and install the standalone preview
+
+```powershell
+npm run build:iphone
+```
+
+Follow the Apple login/signing prompts in the terminal, select the correct team,
+and include the registered iPhone when choosing devices for the provisioning profile.
+If `com.vibecam.app` is unavailable to that team, resolve the app identity before
+changing it; changing it later creates a separate installed app and Film Roll.
+
+After the build succeeds, open its install link/QR on the registered iPhone and
+install VibeCam. The preview contains the local video/live-colour module and its
+JavaScript/assets. It runs without Metro, the PC or a network connection.
+Use airplane mode to verify that during the device walkthrough.
+
+- If a new phone cannot install an older build, register it and create a new preview
+  (or re-sign with an updated provisioning profile). Registration alone does not
+  change an existing binary. See [internal distribution](https://docs.expo.dev/build/internal-distribution/).
+- `development` is a custom development client that needs `npm start`; `preview` is
+  the standalone app to use for acceptance testing.
+- Expo Go cannot load VibeCam's custom native module. Its SDK availability also
+  changes over time, so do not use it to validate this release.
+- Do not uninstall an existing preview just to update it: save any wanted items to
+  Photos first. Uninstalling deletes that app's Film Roll.
+
+## 5. Test the installed build
+
+Record **Settings -> Version / Build**, the iPhone model and iOS version when
+reporting an issue. Follow the full [physical iPhone checklist](RELEASE_READINESS.md#required-physical-iphone-walkthrough).
+Start with:
+
+1. Capture, edit, save and share a photo in airplane mode with each of the six looks.
+2. Check framing/orientation/front mirroring, Original/Look and every available lens.
+3. Record a clip with sound, then one with microphone access denied; save and share.
+4. Force quit and reopen; verify Film Roll, originals, favourites and saved edits.
+5. Deny Photos permission, then grant it and retry Save without losing the capture.
+6. Repeat captures and recordings with live colour active; check interruptions,
+   memory, temperature and battery on the actual phone.
+
+GitHub CI compiles an **unsigned iPhone Release build** using Xcode 26.2, checks the
+embedded JavaScript bundle and runs the native colour/orientation fixtures. This
+catches compile and packaging failures; it does not produce an installable signed
+IPA or validate camera, microphone, Photos or device performance.
+
+## 6. After the device checks: TestFlight
+
+```powershell
+npm run build:iphone:store
+```
+
+This creates a store-signed binary; it does not upload or publish it. After reviewing
+that exact build and completing App Store Connect setup, submit its specific build
+ID with `npm run eas -- submit --platform ios --id BUILD_ID`. Avoid `--latest` when
+there are multiple profiles, because the internal preview is not a TestFlight build.
+See [Expo's TestFlight guide](https://docs.expo.dev/submit/testflight/).
+
+Preview and production use EAS remote build numbers with auto-increment. The local
+`app.json` build number seeds a new remote counter; afterward the installed native
+build number is authoritative. If this bundle ID already has App Store builds,
+check the highest uploaded number and run `npm run eas -- build:version:set` before
+building so the next number is higher. Keep the public app version in `app.json`.
+See [Expo's version management](https://docs.expo.dev/build-reference/app-versions/).
+
+Before submission, complete the remaining [release gates](RELEASE_READINESS.md#remaining-release-gates),
+review [store metadata](STORE_METADATA.md), verify privacy/support URLs, and take
+screenshots from the signed app. Camera looks remain inspired interpretations until
+[paired-shot calibration](CAMERA_CALIBRATION.md) is completed.
+
+## PC preview without developer accounts
+
+```powershell
+npm run web
+```
+
+Open `http://localhost:8081`. Import JPEG/PNG photos from Files if the PC has no camera.
+Photo editing runs locally through the same LUT/shader path; Film Roll uses IndexedDB
+and Save downloads a JPEG. Web cannot record native styled clips or validate iPhone
+camera behaviour. Keep the browser profile to preserve its Film Roll.
+
+## Optional backend development
+
+The backend is outside the first release. The [README](../README.md) lists its API,
+local setup and environment variables; `render.yaml` contains the Render blueprint.
+Use a separate development environment with `EXPO_PUBLIC_ENABLE_CLOUD_FEATURES=true`
+only when working on those features. Every EAS app profile inherits an explicit
+`false` value from `base`. Never put private credentials in `EXPO_PUBLIC_*` values:
+they are readable in the client bundle. A shared client API key is not per-user
+authorization; cloud features still need the isolation and privacy work listed in
+the release gates.
