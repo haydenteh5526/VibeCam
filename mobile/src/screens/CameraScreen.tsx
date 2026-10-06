@@ -169,7 +169,9 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
   };
   const shutter = () => {
     if (countdownTimer.current) { cancelTimer(); return; }
-    if (mode === 'video') { if (recordingRef.current) stopRecording(); else void record(); return; }
+    // Ignore another start tap until React has presented the Stop control.
+    // record()'s synchronous lock prevents a second native recording request.
+    if (mode === 'video') { if (recording) stopRecording(); else void record(); return; }
     if (!ready || lock.current) return;
     if (!timer) { void capture(); return; }
     setCountdown(timer); let left = timer;

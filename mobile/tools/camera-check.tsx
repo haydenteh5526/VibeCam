@@ -58,7 +58,10 @@ window.runCameraChecks = async () => {
     reset(); await delay();
     await click('VIDEO'); await ready();
     assert(device.requests === 0, 'Entering video must not request microphone access');
-    await click('Record video');
+    const start = button('Record video');
+    assert(start && !disabled(start), 'Recording must be ready');
+    start!.click(); start!.click(); await delay();
+    assert(device.records.length === 1 && device.stops === 0, 'Rapid start taps must start once without stopping');
     assert(device.records.at(-1) === true, 'Unpermitted recording must be muted');
     assert(disabled(button('Enable video sound')), 'Sound control must be locked while recording');
     await click('Stop recording');
@@ -67,7 +70,7 @@ window.runCameraChecks = async () => {
     assert(device.records.length === 1 && device.stops === 1, 'Rapid stop taps must not start/stop twice');
     device.finish(); await ready();
     assert(captures.length === 1, 'Finished clip must be delivered exactly once');
-    results.push('Silent capture without permission; controls locked; stop/finish delivered once');
+    results.push('Silent capture without permission; rapid start/stop taps handled; clip delivered once');
 
     await click('Enable video sound');
     assert(disabled(button('Record video')) && disabled(button('PHOTO')), 'Permission request must lock shutter/mode');
