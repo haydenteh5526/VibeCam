@@ -28,6 +28,7 @@ explicitly keep this disabled.
 - **Durable Media** — Originals and edits survive cache eviction; preview, saving and sharing use the same committed media
 - **Photo Import** — Develop JPEG and PNG photos from Files, including when camera access is off
 - **Digicam Video** — Record up to 15 seconds with sound, apply the selected camera's colour look offline, and restyle from the original in Film Roll. Requires an iPhone preview or release build; Expo Go cannot load the local video module.
+- **Sound On / Off** — Choose sound or a silent clip before recording. Your choice is remembered; microphone permission is requested when you enable sound. Clips remain available when access is denied.
 - **Settings** — Default camera, photo character intensity, auto-save, keep-original, haptics, grid
 - **Cloud development mode** — Optional server effects, automatic camera selection and AI experiments behind an explicit developer flag
 - **Platform** — iPhone is the first release target; web supports photo workflow previews, and Android remains in development
@@ -210,7 +211,13 @@ npm test                     # tsx + node:test
 npm run typecheck
 npm run check:release         # checks and exports iOS, Android, web bundles
 npm run test:gpu              # open http://127.0.0.1:8082 and run the shader check
+npm run test:camera           # open http://127.0.0.1:8083 and press Run checks
 ```
+
+The camera interaction check renders the real shooting screen with simulated device
+and microphone responses. It exercises permission failures, mute, recording locks,
+stopping and background recovery. It does not record real media or write Film Roll;
+hardware audio/video and export still require the [iPhone walkthrough](docs/RELEASE_READINESS.md).
 
 Baked LUT assets must stay in sync with the camera parameters. After changing any
 camera's colour values, regenerate them — a test fails if they go stale:

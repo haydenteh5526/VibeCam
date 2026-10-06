@@ -1,6 +1,6 @@
 # iPhone release readiness
 
-Updated 2026-10-05. Target: an offline iPhone camera with photo and short video looks.
+Updated 2026-10-06. Target: an offline iPhone camera with photo and short video looks.
 This is a tested development foundation, not yet a device-verified App Store binary.
 
 ## Implemented
@@ -9,6 +9,11 @@ This is a tested development foundation, not yet a device-verified App Store bin
   responsive viewfinder and compact camera selector on short screens.
 - Photo/video mode, actual hardware lens choices when available, flash/torch, timer
   with cancellation, grid, digital zoom and microphone permission handling.
+- Video Sound On/Off is remembered independently of microphone permission. Opening
+  Video does not prompt; tapping Sound requests access or opens Settings after denial.
+  Return to the app refreshes permission. Audio configuration waits for the new camera
+  to be ready, stays fixed during each clip, and is disabled during photos. Stopping
+  shows a finishing state and prevents duplicate recording actions.
 - One camera picker across capture, editing and settings; the last selected camera is remembered.
 - Live colour previews for six looks in custom iPhone builds (iOS 16+) and the browser. Compare
   Original/Look without changing the selected capture look. Native processing shares
@@ -45,7 +50,7 @@ This is a tested development foundation, not yet a device-verified App Store bin
 
 ## Verification
 
-- 79 mobile tests and TypeScript pass, including recipe validation, metadata restart,
+- 80 mobile tests and TypeScript pass, including recipe validation, metadata restart,
   atomic bulk deletion and real bundled video LUT ordering.
 - 120 backend tests pass, including highlight monotonicity and hue preservation.
 - Expo Doctor: 18/18 checks after installing the SDK-compatible expo-font peer.
@@ -86,9 +91,15 @@ This is a tested development foundation, not yet a device-verified App Store bin
   Browser WCAG 2 A/AA audit reports zero violations; icon contrast, the live video
   surface and native VoiceOver still require manual verification. The full web audit
   also flags existing document heading/landmark structure outside the WCAG-tagged run.
-- PR #29 compiled successfully in GitHub's macOS iOS Simulator job (Xcode 16.4).
-  The updated CI targets an unsigned iPhone Release build on Xcode 26.2, matching EAS.
+- PR #30 compiled an unsigned iPhone Release app with an embedded JavaScript bundle
+  on Xcode 26.2/iOS 26.2. CI uses this configuration, matching the EAS Xcode version.
   Native camera, Photos, orientation, video/audio export and sharing still require hardware.
+- The PC camera interaction harness exercises the real CameraScreen with simulated
+  device responses: silent capture without permission, serialized permission requests,
+  grant/denial/error/retry, explicit mute across camera remounts, controls locked during
+  recording, duplicate stop protection, capture failure recovery, late permission updates,
+  returning from system Settings and stopping on background. Checked at 375x667 and
+  390x844. This verifies UI/handler behavior; it does not verify native media or audio tracks.
 
 ## Required physical iPhone walkthrough
 
@@ -117,6 +128,11 @@ and iOS version with each result.
 9. Record each video look with and without microphone permission; stop early and at
    the 15-second limit. Verify colour, dimensions, orientation, sound, poster, restyle,
    restart, Photos and Share. Repeat after backgrounding and in low storage.
+   Opening Video must not request microphone access. Enable Sound, deny and retry via
+   Settings. After granting access, explicitly mute and confirm the original AND styled
+   export contain no audio track; unmute and check audible sound. Mute must survive
+   returning to the camera and restarting the app. Tap Stop rapidly and check finishing
+   cannot start a second recording. Check very early stops and audio session interruptions.
 10. Check live colour on every lens and mode: portrait orientation, aspect-fill crop,
     front mirroring, Original/Look, fast selection, interruptions and background/resume.
     Ensure video/audio recording remains reliable with the optional preview output.
@@ -139,4 +155,6 @@ and iOS version with each result.
 
 From mobile: npm run typecheck; npm test; npx expo-doctor; npx expo export --platform all.
 npm run test:gpu serves localhost:8082. Open it and press Run GPU check.
+npm run test:camera serves 127.0.0.1:8083. Press Run checks to exercise simulated
+camera/audio interactions; the harness is not included in the app bundle.
 From backend: C:\vibe-cam\.venv\Scripts\python.exe -m pytest -q.

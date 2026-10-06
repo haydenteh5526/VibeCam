@@ -20,6 +20,7 @@ VibeCam develops photos and short videos on your iPhone with six distinct compac
 - Fine-tune photo look strength, exposure, warmth and camera texture
 - Add an amber date stamp, entirely offline
 - Record 15-second clips with sound and the selected camera colour look
+- Switch sound on or off before recording; your choice is remembered
 - Film Roll keeps photos and clips, plus their originals, until you delete them
 - Try another look from the original photo or video without stacking edits
 - Tap Compare to switch between your edit and the original
@@ -39,7 +40,7 @@ Film Roll keeps your items until you delete them, subject to available device st
 
 ## Privacy verification notes
 
-The default preview and production builds disable cloud requests, uploads and AI. Photos, clips and originals stay in app storage unless the user saves or shares a copy. Microphone access is requested when Video mode opens; denied access produces silent clips. There are no app analytics or advertising integrations in the code. Confirm the final signed binary and third-party SDK behavior before answering App Store Connect's privacy questionnaire.
+The default preview and production builds disable cloud requests, uploads and AI. Photos, clips and originals stay in app storage unless the user saves or shares a copy. Microphone access is requested when the user enables Sound in Video mode. Access alone does not override an explicit mute; denied access still allows silent clips. There are no app analytics or advertising integrations in the code. Confirm the final signed binary and third-party SDK behavior before answering App Store Connect's privacy questionnaire.
 
 ## Screenshots still needed from the signed build
 

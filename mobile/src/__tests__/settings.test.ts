@@ -87,6 +87,14 @@ test('normalize handles the on-device look flag', () => {
   assert.equal(normalize({ onDeviceLook: 'yes' }).onDeviceLook, true);
 });
 
+test('video sound migrates older settings and preserves an explicit mute across reloads', () => {
+  assert.equal(normalize({ grid: true }).videoSound, true);
+  assert.equal(normalize({ videoSound: 'false' }).videoSound, true);
+  const muted = normalize({ ...DEFAULT_SETTINGS, videoSound: false });
+  assert.equal(normalize(JSON.parse(JSON.stringify(muted))).videoSound, false);
+  assert.equal(normalize({ ...muted, videoSound: true }).videoSound, true);
+});
+
 test('gradeHeaders always sends character strength and seed', () => {
   const h = gradeHeaders(DEFAULT_SETTINGS, 123);
   assert.equal(h['X-Character'], '1');
