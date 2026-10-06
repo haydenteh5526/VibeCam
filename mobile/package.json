@@ -9,6 +9,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "eas": "npx --yes eas-cli@24.11.0",
+    "build:iphone": "npm run eas -- build --platform ios --profile preview",
+    "build:iphone:store": "npm run eas -- build --platform ios --profile production",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",
     "test:gpu": "node tools/render-smoke.mjs",
@@ -19,6 +22,7 @@
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
     "expo": "~54.0.37",
+    "expo-application": "~7.0.8",
     "expo-asset": "~12.0.13",
     "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",

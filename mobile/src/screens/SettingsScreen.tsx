@@ -1,6 +1,8 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as Application from 'expo-application';
+import appConfig from '../../app.json';
 import { CameraPicker } from '../components/CameraPicker';
 import { IconButton, Notice, theme, ui, useScreenInsets } from '../components/ui';
 import type { Settings } from '../settings';
@@ -15,6 +17,8 @@ function Choices<T extends string | number>({ options, value, onSelect }: { opti
 }
 export function SettingsScreen({ settings, onChange, onClose, error = '', cloudEnabled, rollCount }: Props) {
   const insets = useScreenInsets();
+  const version = Application.nativeApplicationVersion ?? appConfig.expo.version;
+  const build = Application.nativeBuildVersion;
   const set = (patch: Partial<Settings>) => {
     if (settings.haptics) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onChange(patch);
@@ -45,7 +49,10 @@ export function SettingsScreen({ settings, onChange, onClose, error = '', cloudE
         <Text style={s.label}>Light leak</Text><Choices options={[{ value: 0, label: 'Off' }, { value: .25, label: 'Subtle' }, { value: .5, label: 'Medium' }, { value: 1, label: 'Strong' }]} value={settings.lightLeak} onSelect={lightLeak => set({ lightLeak })} />
         <Text style={s.label}>Dust</Text><Choices options={[{ value: 0, label: 'Off' }, { value: .25, label: 'Subtle' }, { value: .5, label: 'Medium' }, { value: 1, label: 'Strong' }]} value={settings.dust} onSelect={dust => set({ dust })} />
       </View></>}
-      <View style={s.about}><Text style={s.aboutBrand}>vibecam</Text><Text style={s.aboutText}>A pocket full of possibilities.</Text><Text style={s.aboutNote}>Camera looks are inspired interpretations of colour and texture. Your iPhone's lens, sensor, light and flash still shape the image.</Text><Text style={s.version}>1.0 · {cloudEnabled ? 'Cloud development enabled' : 'No account. No uploads.'}</Text></View>
+      <View style={s.about}><Text style={s.aboutBrand}>vibecam</Text><Text style={s.aboutText}>A pocket full of possibilities.</Text><Text style={s.aboutNote}>Camera looks are inspired interpretations of colour and texture. Your iPhone's lens, sensor, light and flash still shape the image.</Text>
+        <Text selectable style={s.version}>Version {version}{build ? ` · Build ${build}` : ''}</Text>
+        <Text style={s.version}>{cloudEnabled ? 'Cloud development enabled' : 'No account. No uploads.'}</Text>
+      </View>
     </ScrollView>
   </View>;
 }

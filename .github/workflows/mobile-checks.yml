@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+env:
+  EXPO_PUBLIC_ENABLE_CLOUD_FEATURES: "false"
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
@@ -39,9 +42,18 @@ jobs:
 
   ios-build:
     runs-on: macos-15
+    env:
+      # Match the EAS iPhone image; the runner default may use an older SDK.
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify iPhone toolchain
+        run: |
+          xcodebuild -version
+          sdk_version=$(xcrun --sdk iphoneos --show-sdk-version)
+          test "${sdk_version%%.*}" -ge 26
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -70,7 +82,7 @@ jobs:
         working-directory: mobile/ios
         run: pod install
 
-      - name: Compile iOS Simulator app without signing
+      - name: Compile iPhone release app without signing
         working-directory: mobile/ios
         run: |
           workspaces=(./*.xcworkspace)
@@ -78,7 +90,10 @@ jobs:
           workspace="${workspaces[0]}"
           scheme=$(basename "$workspace" .xcworkspace)
           xcodebuild -workspace "$workspace" -scheme "$scheme" \
-            -configuration Debug -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/vibecam-derived" \
             CODE_SIGNING_ALLOWED=NO build
+          app="$RUNNER_TEMP/vibecam-derived/Build/Products/Release-iphoneos/$scheme.app"
+          test -s "$app/main.jsbundle"
+          /usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$app/Info.plist"

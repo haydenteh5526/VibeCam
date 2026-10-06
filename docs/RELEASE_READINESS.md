@@ -86,12 +86,15 @@ This is a tested development foundation, not yet a device-verified App Store bin
   Browser WCAG 2 A/AA audit reports zero violations; icon contrast, the live video
   surface and native VoiceOver still require manual verification. The full web audit
   also flags existing document heading/landmark structure outside the WCAG-tagged run.
-- PR #27 compiled successfully in GitHub's macOS iOS Simulator job.
+- PR #29 compiled successfully in GitHub's macOS iOS Simulator job (Xcode 16.4).
+  The updated CI targets an unsigned iPhone Release build on Xcode 26.2, matching EAS.
   Native camera, Photos, orientation, video/audio export and sharing still require hardware.
 
 ## Required physical iPhone walkthrough
 
-Use a signed standalone preview build, including the local video module.
+Use a signed standalone preview build, including the local video module; follow
+[the Windows build guide](DEPLOY.md). Record Settings' Version/Build, device model
+and iOS version with each result.
 
 1. Deny camera, open Film Roll and import. Enable camera in Settings and return.
 2. Capture an asymmetric chart in portrait/landscape, front/back and each available
@@ -127,7 +130,7 @@ Use a signed standalone preview build, including the local video module.
 - Measured paired-shot calibration; see CAMERA_CALIBRATION.md. The live viewfinder
   previews colour, not the full photo finish or real-camera optics. Do not advertise exact matching.
 - Review final privacy/support URLs, store copy and screenshots against the actual binary.
-- Assess remaining SDK 54 toolchain advisories (35: 11 moderate, 24 high in the October 4 npm audit).
+- Assess remaining SDK 54 toolchain advisories (41: 16 moderate, 25 high in the October 6 npm audit).
   Several fixes require a major Expo migration; perform that separately with device regression checks.
 - Cloud features remain outside v1. They need user isolation, retention/deletion and a
   corrected/tested optional AI integration before public exposure.

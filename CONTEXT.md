@@ -1,6 +1,6 @@
 # VibeCam project context
 
-Updated 2026-10-05. This document supersedes the historical branch/status notes.
+Updated 2026-10-06. This document supersedes the historical branch/status notes.
 
 ## Product
 
@@ -65,12 +65,16 @@ from backend (use the full path to the interpreter).
 npm run test:gpu serves the real shader check on localhost:8082; press Run GPU check.
 npx expo export --platform all checks bundles. npx expo-doctor checks dependencies.
 GitHub macOS CI checks the actual Core Image LUT against 4,096 colours per table and
-compiles an unsigned Simulator build; it does not validate real camera,
+compiles an unsigned iPhone Release build with Xcode 26.2/iOS 26 SDK and an embedded
+JavaScript bundle; it does not validate real camera,
 microphone, native image orientation, Photos, sharing or thermal behaviour.
 
 ## Next release work
 
-Produce a signed iPhone preview build; follow docs/RELEASE_READINESS.md on hardware.
+Produce a signed iPhone preview build using docs/DEPLOY.md; follow
+docs/RELEASE_READINESS.md on hardware. EAS and CI pin Xcode 26.2; preview and production
+use remote auto-incrementing build numbers. Settings shows the installed native version
+and build. Expo login, Apple team access and device registration are still required.
 Validate live colour preview framing, front mirroring, recording coexistence and battery
 on hardware, then calibrate against paired camera/iPhone shots.
 Video currently uses camera colour, without photo texture/date adjustments.
