@@ -34,6 +34,7 @@ export const useMicrophonePermissions = () => [useSyncExternalStore(subscribe, (
 export const ImpactFeedbackStyle = { Light: 'light' };
 export const impactAsync = async () => {};
 export const supportsLiveColour = false;
+export const PhotoLookPreview = () => null;
 export const LiveLookPreview = ({ onStatus }: { onStatus: (status: 'unavailable') => void }) => {
   useEffect(() => { onStatus('unavailable'); }, [onStatus]);
   return null;

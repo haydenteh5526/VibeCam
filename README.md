@@ -24,6 +24,7 @@ explicitly keep this disabled.
 - **On-device Developing** — Baked 3D LUTs render photos on the GPU and video during local export
 - **Live Colour** — Preview the selected camera's colour while shooting, with an Original/Look comparison. Custom iPhone builds on iOS 16+ and web support this; texture and date finishing are added after capture.
 - **Interactive Editing** — Preview camera, strength, exposure, warmth, texture and date changes before applying a full-resolution edit; discard returns to the saved version.
+- **Visual Camera Collection** — Browse photo cards rendered from one shared scene, then compare two looks at full size on the sample or your own photo. Use returns to shooting or to an unapplied edit, preserving your original and adjustments.
 - **Film Roll** — Photos and clips stay on the iPhone with their originals until you delete them; tap an item to try another look
 - **Durable Media** — Originals and edits survive cache eviction; preview, saving and sharing use the same committed media
 - **Photo Import** — Develop JPEG and PNG photos from Files, including when camera access is off

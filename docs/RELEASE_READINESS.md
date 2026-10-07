@@ -1,6 +1,6 @@
 # iPhone release readiness
 
-Updated 2026-10-06. Target: an offline iPhone camera with photo and short video looks.
+Updated 2026-10-07. Target: an offline iPhone camera with photo and short video looks.
 This is a tested development foundation, not yet a device-verified App Store binary.
 
 ## Implemented
@@ -15,6 +15,13 @@ This is a tested development foundation, not yet a device-verified App Store bin
   to be ready, stays fixed during each clip, and is disabled during photos. Stopping
   shows a finishing state and prevents duplicate recording actions.
 - One camera picker across capture, editing and settings; the last selected camera is remembered.
+- Visual photo cards and a camera collection with full-size A/B look switching.
+  Sample images use the actual photo renderer, from one bundled illustrative scene.
+  Photo comparisons use the retained original and current recipe. Browsing/canceling
+  preserves the active camera or existing draft; Use chooses a camera or creates a
+  draft, and Apply still commits at full quality. The camera is released while browsing;
+  video playback pauses behind the collection and resumes on close only if it was
+  playing beforehand and the app stayed active. Video is labelled as colour-only.
 - Live colour previews for six looks in custom iPhone builds (iOS 16+) and the browser. Compare
   Original/Look without changing the selected capture look. Native processing shares
   the existing capture session; browser processing shares the existing camera stream.
@@ -50,7 +57,7 @@ This is a tested development foundation, not yet a device-verified App Store bin
 
 ## Verification
 
-- 80 mobile tests and TypeScript pass, including recipe validation, metadata restart,
+- 84 mobile tests and TypeScript pass, including overlay playback recovery, recipe validation, metadata restart,
   atomic bulk deletion and real bundled video LUT ordering.
 - 120 backend tests pass, including highlight monotonicity and hue preservation.
 - Expo Doctor: 18/18 checks after installing the SDK-compatible expo-font peer.
@@ -100,6 +107,14 @@ This is a tested development foundation, not yet a device-verified App Store bin
   recording, duplicate stop protection, capture failure recovery, late permission updates,
   returning from system Settings and stopping on background. Checked at 375x667 and
   390x844. This verifies UI/handler behavior; it does not verify native media or audio tracks.
+- Visual picker walkthrough at 390x844 and 375x667: browse/cancel, separate A/B choices,
+  return to a ready camera, remembered camera, import, preserve an existing exposure
+  draft on cancel, select a new look without committing, Apply with original/recipe
+  preserved, and JPEG download. Repeated A/B/Original switches use one prepared source
+  and at most one GL surface. Injected context loss shows Original with successful Retry.
+  Escape closes the collection and restores keyboard focus; obscured web controls are
+  inert. The collection has zero automated WCAG 2 A/AA violations; image/icon contrast
+  and native VoiceOver remain manual checks. The PC harness also checks look selection.
 
 ## Required physical iPhone walkthrough
 

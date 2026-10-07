@@ -127,6 +127,20 @@ window.runCameraChecks = async () => {
     await click('Enable video sound'); device.answer({ granted: true, canAskAgain: true }); await ready();
     assert(button('Mute video sound'), 'Retry must recover sound');
     results.push('Permission error releases locks and retry succeeds');
+
+    await click('Explore camera looks, G7X III');
+    assert(!document.querySelector('[data-testid="device-audio"]'), 'Look browser must release the camera');
+    await click('Preview X100, Soft & understated');
+    await click('Close look browser'); await ready();
+    assert(button('Explore camera looks, G7X III'), 'Closing the browser must not change the chosen camera');
+    await click('Explore camera looks, G7X III');
+    await click('Compare two looks'); await click('View B: Original');
+    await click('Preview CCD 2004, Grainy & nostalgic');
+    await click('View A: G7X III');
+    assert(button('Use G7X III'), 'A must retain its own comparison choice');
+    await click('View B: CCD 2004'); await click('Use CCD 2004'); await ready();
+    assert(button('Explore camera looks, CCD 2004'), 'Use look must return to the chosen, ready camera');
+    results.push('Look browser preserves the camera on cancel; A/B choices stay separate; Use returns to a ready camera');
     return results;
   } finally {
     device.controlled = false;

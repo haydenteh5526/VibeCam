@@ -3,9 +3,10 @@ import { ActivityIndicator, Animated, AppState, Image, Linking, Pressable, Style
 import { CameraView, type CameraType, type FlashMode, useMicrophonePermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { CameraPicker } from '../components/CameraPicker';
+import { LookBrowser } from '../components/LookBrowser';
 import { LiveLookPreview, supportsLiveColour } from '../components/LiveLookPreview';
 import { previewCaption, type LivePreviewStatus } from '../look/livePreview';
-import { Icon, IconButton, Notice, theme, ui, useScreenInsets } from '../components/ui';
+import { Icon, IconButton, Notice, theme, ui, useModalBackground, useScreenInsets } from '../components/ui';
 import { useLayoutHeight, useLayoutWidth } from '../components/DeviceFrame';
 import { getLook, type FilterId } from '../filters';
 import type { SelectedFile } from '../types';
@@ -67,8 +68,8 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
   const [lenses, setLenses] = useState<Lens[]>([]);
   const [lens, setLens] = useState<string>();
   const [error, setError] = useState('');
-  const [info, setInfo] = useState(false);
   const [chooseLook, setChooseLook] = useState(false);
+  const background = useModalBackground(chooseLook);
   const [space, setSpace] = useState(360);
   const [previewStatus, setPreviewStatus] = useState<LivePreviewStatus>('loading');
   const [originalPreview, setOriginalPreview] = useState(false);
@@ -206,11 +207,12 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
       setError('Video is available in the installed iPhone app. You can keep shooting photos here.'); return;
     }
     setError('');
-    setReadyKey(null); setMode(next); setFlashMode(next === 'video' ? 'off' : 'auto'); setInfo(false);
+    setReadyKey(null); setMode(next); setFlashMode(next === 'video' ? 'off' : 'auto');
     if (camera === 'auto' && next === 'video') { setCamera('g7x'); onCameraChange('g7x'); }
     buzz();
   };
-  return <View style={[ui.screen, { paddingTop: insets.top, paddingBottom: Math.max(8, insets.bottom) }]}>
+  return <><View ref={background} accessibilityElementsHidden={chooseLook} importantForAccessibility={chooseLook ? 'no-hide-descendants' : 'auto'} aria-hidden={chooseLook}
+    style={[ui.screen, { paddingTop: insets.top, paddingBottom: Math.max(8, insets.bottom) }]}>
     {!compact && <View style={s.header}>
       <View style={ui.row}><View style={s.brandDot} /><Text style={s.brand}>vibecam</Text></View>
       <View style={ui.row}><Text style={s.offline}>YOUR POCKET CAMERA</Text><IconButton icon="options-outline" label="Camera settings" onPress={onSettings} disabled={busy} /></View>
@@ -244,12 +246,12 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
           if (pinch.current !== null) setZoom(v => Math.min(1, Math.max(0, v + (distance - pinch.current!) * 0.003)));
           pinch.current = distance;
         }} onTouchEnd={() => { pinch.current = null; }}>
-        {foreground && <CameraView key={cameraKey} ref={cam} style={StyleSheet.absoluteFill} facing={facing}
+        {foreground && !chooseLook && <CameraView key={cameraKey} ref={cam} style={StyleSheet.absoluteFill} facing={facing}
           mode={mode === 'photo' ? 'picture' : 'video'} flash={mode === 'photo' ? flashMode : 'off'}
           enableTorch={mode === 'video' && flashMode === 'on' && facing === 'back'} mute={mode !== 'video' || !soundOn} zoom={zoom}
           selectedLens={lens} videoQuality="720p" autofocus="on" animateShutter={false}
           onCameraReady={() => { void cameraReady(cameraKey); }} onMountError={e => setError(e.message)} />}
-        {foreground && ready && !originalPreview && camera !== 'auto' && camera !== 'original' && <LiveLookPreview
+        {foreground && !chooseLook && ready && !originalPreview && camera !== 'auto' && camera !== 'original' && <LiveLookPreview
           key={cameraKey + (lens ?? '') + previewAttempt} camera={camera} mirrored={facing === 'front'} onStatus={setPreviewStatus} />}
         {!ready && <View style={s.loading}><ActivityIndicator color={theme.accent} /><Text style={s.hudText}>Starting camera…</Text></View>}
         {grid && <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -269,11 +271,10 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
     </View>
     {mode === 'video' && <Text accessibilityLiveRegion="polite" style={s.soundHint}>{finishing ? 'Finishing your clip…' : recording ? 'Tap shutter to stop' : audioPending ? 'Waiting for microphone access…' : soundOn ? '720p · Up to 15s · Sound on' : '720p · Up to 15s · Silent — tap Sound for audio'}</Text>}
     {error || appError ? <View style={s.error}><View style={{ flex: 1 }}><Notice text={error || appError || ''} error /></View><IconButton icon="close" label="Dismiss camera message" onPress={() => { setError(''); onDismissError(); }} /></View> : null}
-    <Pressable accessibilityRole="button" accessibilityLabel={(compact ? 'Choose camera look, ' : 'About ') + look.name} accessibilityState={{ expanded: compact ? chooseLook : info }} disabled={busy}
-      onPress={() => compact ? setChooseLook(true) : setInfo(v => !v)} style={s.lookSummary}>
-      <Text style={s.lookName}>{camera === 'auto' ? 'Automatic look' : compact ? look.name + ' · ' + look.tagline : look.tagline}</Text><Icon name={compact ? 'chevron-down' : info ? 'chevron-up' : 'information-circle-outline'} size={16} color={theme.muted} />
+    <Pressable accessibilityRole="button" accessibilityLabel={'Explore camera looks, ' + look.name} accessibilityState={{ expanded: chooseLook, disabled: busy }} disabled={busy}
+      onPress={() => { setReadyKey(null); setCameraGeneration(value => value + 1); setChooseLook(true); }} style={s.lookSummary}>
+      <Text style={s.lookName}>{camera === 'auto' ? 'Automatic look' : look.name + ' · ' + look.tagline}</Text><Icon name="chevron-down" size={16} color={theme.accent} />
     </Pressable>
-    {info && !compact && <View style={s.info}><Text style={ui.body}>{look.description}</Text><Text style={s.infoBest}>{look.bestFor}</Text></View>}
     {!compact && <CameraPicker active={camera} showAuto={cloudEnabled && mode === 'photo'} showOriginal disabled={busy}
       onSelect={chooseCamera} />}
     <View style={s.previewRow}>
@@ -308,14 +309,10 @@ export function CameraScreen({ onCapture, onCaptureVideo, videoAvailable, onGall
         buzz(); setReadyKey(null); setLens(undefined); setLenses([]); setZoom(0); setFacing(v => v === 'back' ? 'front' : 'back');
       }} style={s.flip} />
     </View>
-    {chooseLook && compact && <View style={s.lookModal} accessibilityViewIsModal>
-      <View style={s.lookSheet}>
-        <View style={ui.header}><Text style={[s.lookName, { fontSize: 20 }]}>Choose your camera</Text><IconButton icon="close" label="Close camera choices" onPress={() => setChooseLook(false)} /></View>
-        <CameraPicker active={camera} showAuto={cloudEnabled && mode === 'photo'} showOriginal onSelect={id => { chooseCamera(id); setChooseLook(false); }} />
-        <View style={s.info}><Text style={ui.body}>{look.description}</Text></View>
-      </View>
-    </View>}
-  </View>;
+  </View>
+    {chooseLook && <LookBrowser active={camera} video={mode === 'video'} showAuto={cloudEnabled && mode === 'photo'} onClose={() => setChooseLook(false)}
+      onSelect={id => { chooseCamera(id); setChooseLook(false); }} />}
+  </>;
 }
 const s = StyleSheet.create({
   header: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
@@ -342,7 +339,6 @@ const s = StyleSheet.create({
   recordFill: { height: 4, backgroundColor: '#ed7465' },
   lookSummary: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 18 },
   lookName: { fontSize: 12, color: theme.text, fontWeight: '500' },
-  info: { paddingHorizontal: 22, paddingBottom: 8 }, infoBest: { color: theme.accent, fontSize: 11, marginTop: 3 },
   previewRow: { minHeight: 44, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   caption: { color: theme.muted, fontSize: 10, flexShrink: 1 },
   previewToggle: { minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -356,6 +352,4 @@ const s = StyleSheet.create({
   roll: { width: 48, height: 48, borderRadius: 13, overflow: 'hidden', backgroundColor: theme.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.line },
   thumb: { width: '100%', height: '100%' }, flip: { width: 48, height: 48 },
   error: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 6 },
-  lookModal: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000000a0', justifyContent: 'flex-end' },
-  lookSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 30, gap: 12 },
 });

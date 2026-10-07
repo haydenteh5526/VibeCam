@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,22 @@ export const theme = {
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export const Icon = ({ name, size = 22, color = theme.text }: { name: IconName; size?: number; color?: string }) =>
   <Ionicons name={name} size={size} color={color} accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden />;
+
+/** Native uses accessibilityElementsHidden; web also removes obscured controls from tab order. */
+export function useModalBackground(hidden: boolean) {
+  const ref = useRef<View>(null);
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'web' || !hidden || !ref.current) return;
+    const element = ref.current as unknown as HTMLElement;
+    const previous = document.activeElement instanceof HTMLElement && element.contains(document.activeElement) ? document.activeElement : null;
+    element.inert = true;
+    return () => {
+      element.inert = false;
+      requestAnimationFrame(() => { if (previous?.isConnected) previous.focus(); });
+    };
+  }, [hidden]);
+  return ref;
+}
 
 export function useScreenInsets() {
   const insets = useSafeAreaInsets();
