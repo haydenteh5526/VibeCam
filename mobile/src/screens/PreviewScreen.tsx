@@ -3,8 +3,9 @@ import { AppState, BackHandler, Image, Modal, Platform, Pressable, ScrollView, S
 import { VideoPreview } from '../components/VideoPreview';
 import { DevelopingOverlay } from '../components/DevelopingOverlay';
 import { CameraPicker } from '../components/CameraPicker';
+import { LookBrowser } from '../components/LookBrowser';
 import { PhotoLookPreview } from '../components/PhotoLookPreview';
-import { Button, Icon, IconButton, Notice, theme, ui, useScreenInsets } from '../components/ui';
+import { Button, Icon, IconButton, Notice, theme, ui, useModalBackground, useScreenInsets } from '../components/ui';
 import { useLayoutHeight } from '../components/DeviceFrame';
 import { FILTERS, type FilterId } from '../filters';
 import { DEFAULT_RECIPE, normalizeRecipe, type PhotoRecipe } from '../photoRecipe';
@@ -41,7 +42,9 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
   const [tab, setTab] = useState<'looks' | 'adjust'>('looks');
   const [adjustment, setAdjustment] = useState<AdjustmentId>('amount');
   const [showOriginal, setShowOriginal] = useState(false);
+  const [lookBrowser, setLookBrowser] = useState(false);
   const [dialog, setDialog] = useState<'delete' | 'leave' | null>(null);
+  const background = useModalBackground(lookBrowser || !!dialog);
   const [vibe, setVibe] = useState('');
   const [draft, setDraft] = useState(() => normalizeRecipe(recipe));
   const [draftCamera, setDraftCamera] = useState(selectedCamera);
@@ -63,7 +66,7 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
   const displayName = look?.name ?? cameraName;
   const dirty = !video && hasPhotoChanges(draftCamera, draft, selectedCamera, { amount, exposure, warmth, character, dateStamp });
   const canAdjust = !video && !!look && look.id !== 'original' && canDevelop && !!original;
-  const showPreview = dirty && camera !== 'original' && !!look && !!original && !busy && foreground;
+  const showPreview = dirty && camera !== 'original' && !!look && !!original && !busy && foreground && !lookBrowser;
   const close = useCallback(() => {
     if (!busy) { if (dirty) setDialog('leave'); else onClose(); }
   }, [busy, dirty, onClose]);
@@ -93,7 +96,8 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
   const mediaUri = showOriginal || (dirty && camera === 'original') ? original : captured;
   const previewReady = showPreview && previewStatus === 'ready';
   const badge = showOriginal ? 'ORIGINAL' : dirty ? camera === 'original' || previewReady ? 'UNAPPLIED PREVIEW' : 'LAST APPLIED EDIT' : '';
-  return <View style={[ui.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+  return <><View ref={background} accessibilityElementsHidden={lookBrowser || !!dialog} importantForAccessibility={lookBrowser || dialog ? 'no-hide-descendants' : 'auto'} aria-hidden={lookBrowser || !!dialog}
+    style={[ui.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
     <View style={[ui.header, s.header]}>
       <Pressable accessibilityRole="button" onPress={close} disabled={busy} style={[s.back, busy && ui.disabled]}><Icon name="arrow-back" size={20} /><Text style={s.backText}>{closeLabel}</Text></Pressable>
       <View style={ui.row}>
@@ -104,7 +108,7 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
     <View style={s.photoArea}>
       <View style={s.media} onLayout={event => setMediaSize(event.nativeEvent.layout)} accessible={!video} accessibilityRole={video ? undefined : 'image'}
         accessibilityLabel={video ? undefined : showOriginal || (dirty && camera === 'original') ? 'Original photo' : previewReady ? 'Unapplied preview of ' + displayName : cameraName + ' applied photo'}>
-        {video && mediaUri ? <VideoPreview uri={mediaUri} /> : mediaUri ? <Image source={{ uri: mediaUri }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
+        {video && mediaUri ? <VideoPreview uri={mediaUri} paused={lookBrowser || !!dialog} /> : mediaUri ? <Image source={{ uri: mediaUri }} style={StyleSheet.absoluteFill} resizeMode="contain" /> : null}
         {showPreview && <PhotoLookPreview uri={original!} width={mediaSize.width} height={mediaSize.height}
           options={{ camera, recipe: draft, seed, characterStrength: draft.character, takenAt }} onStatus={setPreviewStatus}
           hidden={showOriginal || previewStatus !== 'ready'} />}
@@ -127,7 +131,10 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
       {!original && <Notice text="The original is unavailable. You can still save and share this item." />}
       {tab === 'looks' || video ? <>
         <View style={{ marginHorizontal: -16 }}><CameraPicker active={camera} onSelect={select} showOriginal showAuto={cloudEnabled} disabled={busy || !original || !canDevelop} /></View>
-        {look ? <View style={s.description}><Text style={s.descriptionTitle}>{look.tagline}</Text><Text style={s.bestFor}>{look.bestFor}</Text></View> : <Text style={s.editNote}>Your custom developed look. Choose a camera to start again from the original.</Text>}
+        <Pressable accessibilityRole="button" accessibilityLabel={video ? 'Explore camera looks' : 'Compare looks on your photo'} disabled={busy || !original || !canDevelop}
+          onPress={() => setLookBrowser(true)} style={[s.explore, (busy || !original || !canDevelop) && ui.disabled]}>
+          <Icon name="copy-outline" size={17} color={theme.accent} /><Text style={s.exploreText}>{video ? 'Explore camera looks' : 'Compare looks on your photo'}</Text><Icon name="chevron-forward" size={14} color={theme.accent} />
+        </Pressable>
       </> : canAdjust ? <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.adjustmentTabs}>
           {[...ADJUSTMENTS, { id: 'dateStamp' as const, label: 'Date' }].map(item => <Pressable key={item.id} accessibilityRole="button"
@@ -161,6 +168,9 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
         {cloudEnabled && <Button label="Upload" onPress={onUpload} disabled={busy || !backendReady} />}
       </>}
     </View>
+  </View>
+    {lookBrowser && <LookBrowser active={camera} video={video} showAuto={cloudEnabled} photo={!video && original ? { uri: original, recipe: draft, seed, takenAt } : undefined}
+      onClose={() => setLookBrowser(false)} onSelect={id => { select(id); setLookBrowser(false); }} />}
     {dialog && <Modal transparent animationType="fade" onRequestClose={() => setDialog(null)}><View style={s.modal} accessibilityViewIsModal>
       <View style={s.dialog}><Text style={s.dialogTitle}>{dialog === 'leave' ? 'Discard your changes?' : 'Delete from Film Roll?'}</Text>
         <Text style={ui.body}>{dialog === 'leave' ? 'Your last applied edit and original are safe in Film Roll. These preview changes have not been applied.' : 'This removes the item and its original. Copies already saved to Photos stay there.'}</Text>
@@ -168,9 +178,10 @@ export function PreviewScreen({ file, captured, original, backendReady, cloudEna
         <Button label={dialog === 'leave' ? 'Discard and leave' : 'Delete item'} danger onPress={() => { setDialog(null); if (dialog === 'leave') onClose(); else onDelete(); }} disabled={busy} />
       </View>
     </View></Modal>}
-  </View>;
+  </>;
 }
 const s = StyleSheet.create({
+  explore: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, exploreText: { color: theme.accent, fontSize: 12, fontWeight: '600' },
   header: { paddingVertical: 4 }, back: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 8 }, backText: { color: theme.text, fontSize: 14, fontWeight: '600' },
   photoArea: { flex: 1, minHeight: 150, paddingHorizontal: 16 }, media: { flex: 1, backgroundColor: '#080a07', borderRadius: 18, overflow: 'hidden' },
   mediaFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 9 },
@@ -181,7 +192,6 @@ const s = StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 4, marginHorizontal: 16, borderBottomWidth: 1, borderBottomColor: theme.line }, tab: { minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: theme.accent }, tabText: { fontSize: 13, fontWeight: '700', color: theme.muted },
   tools: { flexGrow: 0, flexShrink: 0 }, toolContent: { paddingHorizontal: 16, paddingBottom: 8 },
-  description: { paddingHorizontal: 4, paddingBottom: 8, gap: 5 }, descriptionTitle: { color: theme.text, fontSize: 13, fontWeight: '600' }, bestFor: { color: theme.muted, fontSize: 12 },
   adjustmentTabs: { gap: 4, paddingTop: 8 }, adjustmentTab: { minHeight: 44, minWidth: 56, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center', borderRadius: 12 },
   adjustmentActive: { backgroundColor: theme.surface }, adjustmentLabel: { fontSize: 12, color: theme.muted, fontWeight: '600' },
   editFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, editNote: { color: theme.muted, fontSize: 11, lineHeight: 16 },

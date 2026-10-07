@@ -1,6 +1,6 @@
 # VibeCam project context
 
-Updated 2026-10-06. This document supersedes the historical branch/status notes.
+Updated 2026-10-07. This document supersedes the historical branch/status notes.
 
 ## Product
 
@@ -23,6 +23,7 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 - PR #27 merged the refined camera, editor and Film Roll, plus corrected LUT axes.
 - PR #28 merged interactive photo editing previews. PR #29 adds live camera colour.
 - PR #30 merged Xcode 26.2 Release checks, EAS build numbering and Windows build instructions.
+- PR #31 merged remembered video sound controls, recording locks and the PC interaction check.
 - docs/RELEASE_READINESS.md records verification and the remaining physical iPhone gates.
 
 ## Architecture
@@ -30,6 +31,14 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 - mobile/: Expo SDK 54, React Native 0.81, TypeScript, expo-camera.
 - App.tsx owns capture, committed media, navigation, settings and export.
 - src/components/ui.tsx and CameraPicker.tsx provide the shared design and camera selector.
+- CameraPicker uses bundled JPEG samples from one illustrative scene, rendered by the
+  actual photo shader. LookBrowser adds full-size A/B comparison on that scene or a
+  retained original with the current recipe. Selection only changes the camera or draft;
+  Apply still owns the full-resolution commit. Closing preserves the previous selection.
+  The camera and editor GPU preview are released behind this modal. PhotoLookPreview
+  keeps its resized source through Original/A/B switches and uses one GL surface.
+  Source provenance and rebuilding instructions are in assets/look-samples/SOURCES.md
+  under mobile. These illustrative samples are not physical camera calibration data.
 - src/photoRecipe.ts validates per-photo strength, exposure, warmth, texture and date.
 - src/look/renderFrame.ts + shader.ts apply bundled LUTs and photo character offline.
   renderStill.ts uses expo-gl on native; renderWeb.ts exercises the same shader in browsers.

@@ -9,10 +9,11 @@ const bundle = await build({
   entryPoints: [path('./camera-check.tsx')], bundle: true, write: false, platform: 'browser',
   define: { 'process.env.NODE_ENV': '"development"', __DEV__: 'true' },
   resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.json'],
+  loader: { '.jpg': 'dataurl', '.png': 'dataurl', '.ttf': 'dataurl' },
   alias: { 'react-native': 'react-native-web', 'expo-camera': path('./camera-device.tsx'),
     'expo-haptics': path('./camera-device.tsx'), '@expo/vector-icons/Ionicons': path('./camera-icons.tsx') },
-  plugins: [{ name: 'no-native-live-preview', setup(b) {
-    b.onResolve({ filter: /\/LiveLookPreview$/ }, () => ({ path: path('./camera-device.tsx') }));
+  plugins: [{ name: 'simulated-media-previews', setup(b) {
+    b.onResolve({ filter: /\/(LiveLookPreview|PhotoLookPreview)$/ }, () => ({ path: path('./camera-device.tsx') }));
   } }],
 });
 const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

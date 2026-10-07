@@ -25,11 +25,15 @@ export function PhotoLookPreview({ uri, width, height, options, onStatus, hidden
   useEffect(() => {
     let cancelled = false;
     onStatus('loading');
+    if (camera === 'original') return;
     void loadPreviewLut(camera).then(texture => {
       if (!cancelled) setLut({ camera, texture });
     }).catch(() => { if (!cancelled) onStatus('unavailable'); });
     return () => { cancelled = true; };
   }, [camera, onStatus]);
+  useEffect(() => {
+    if (camera === 'original' && loaded?.uri === uri) onStatus('ready');
+  }, [camera, loaded, uri, onStatus]);
   const source = useMemo(() => loaded?.uri === uri && lut?.camera === camera
     ? { ...loaded.photo, lut: lut.texture } : null, [loaded, lut, uri, camera]);
   if (!source || !width || !height) return null;

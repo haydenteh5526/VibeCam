@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FILTERS, type FilterId } from '../filters';
+import { LOOK_SAMPLES } from '../look/samples';
 import { Icon, theme } from './ui';
 
 export function CameraBody({ color, accent, small = false }: { color: string; accent: string; small?: boolean }) {
@@ -15,13 +16,13 @@ export function CameraPicker({ active, onSelect, showAuto = false, showOriginal 
   const scroll = useRef<ScrollView>(null);
   const cameras = FILTERS.filter(f => showOriginal || f.id !== 'original');
   const index = cameras.findIndex(f => f.id === active) + (showAuto ? 1 : 0);
-  useEffect(() => { scroll.current?.scrollTo({ x: Math.max(0, index * 106 - 100), animated: true }); }, [index]);
+  useEffect(() => { scroll.current?.scrollTo({ x: Math.max(0, index * 112 - 100), animated: true }); }, [index]);
   return <ScrollView ref={scroll} horizontal showsHorizontalScrollIndicator={false} style={s.strip} contentContainerStyle={s.row}>
     {showAuto && <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel="Automatic camera selection" onPress={() => onSelect('auto')} style={[s.card, active === 'auto' && s.selected]}><Icon name="sparkles-outline" color={theme.accent} /><Text style={s.name}>Auto</Text></Pressable>}
     {cameras.map(camera => <Pressable key={camera.id} disabled={disabled} onPress={() => onSelect(camera.id)} accessibilityRole="button"
       accessibilityLabel={`${camera.name}, ${camera.tagline}`} accessibilityState={{ selected: camera.id === active, disabled }}
       style={({ pressed }) => [s.card, camera.id === active && s.selected, pressed && { opacity: 0.7 }]}>
-      <CameraBody color={camera.body} accent={camera.dot} small />
+      <Image source={LOOK_SAMPLES[camera.id]} style={s.sample} accessible={false} />
       <Text numberOfLines={1} style={[s.name, camera.id === active && { color: theme.accent }]}>{camera.name}</Text>
       <View style={[s.marker, camera.id === active && { backgroundColor: theme.accent }]} />
     </Pressable>)}
@@ -29,7 +30,8 @@ export function CameraPicker({ active, onSelect, showAuto = false, showOriginal 
 }
 const s = StyleSheet.create({
   strip: { flexGrow: 0, flexShrink: 0 }, row: { paddingHorizontal: 18, gap: 8, paddingVertical: 6 },
-  card: { width: 98, minHeight: 91, borderRadius: 16, borderWidth: 1, borderColor: 'transparent', paddingTop: 4, paddingBottom: 5, alignItems: 'center', justifyContent: 'center' },
+  card: { width: 104, minHeight: 102, borderRadius: 13, borderWidth: 1, borderColor: 'transparent', padding: 4, alignItems: 'center', justifyContent: 'center' },
+  sample: { width: 94, height: 66, borderRadius: 9, marginBottom: 4 },
   selected: { backgroundColor: theme.surface, borderColor: theme.line },
   name: { color: theme.muted, fontWeight: '600', fontSize: 12, marginTop: 2 }, marker: { width: 16, height: 2, marginTop: 6, borderRadius: 1 },
   body: { width: 64, height: 41, borderRadius: 8, borderWidth: 1, borderColor: '#ffffff25', justifyContent: 'center', alignItems: 'center' },
