@@ -57,7 +57,7 @@ This is a tested development foundation, not yet a device-verified App Store bin
 
 ## Verification
 
-- 80 mobile tests and TypeScript pass, including recipe validation, metadata restart,
+- 84 mobile tests and TypeScript pass, including overlay playback recovery, recipe validation, metadata restart,
   atomic bulk deletion and real bundled video LUT ordering.
 - 120 backend tests pass, including highlight monotonicity and hue preservation.
 - Expo Doctor: 18/18 checks after installing the SDK-compatible expo-font peer.
