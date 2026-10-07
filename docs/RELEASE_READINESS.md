@@ -20,7 +20,8 @@ This is a tested development foundation, not yet a device-verified App Store bin
   Photo comparisons use the retained original and current recipe. Browsing/canceling
   preserves the active camera or existing draft; Use chooses a camera or creates a
   draft, and Apply still commits at full quality. The camera is released while browsing;
-  video playback pauses behind the collection. Video is labelled as colour-only.
+  video playback pauses behind the collection and resumes on close only if it was
+  playing beforehand and the app stayed active. Video is labelled as colour-only.
 - Live colour previews for six looks in custom iPhone builds (iOS 16+) and the browser. Compare
   Original/Look without changing the selected capture look. Native processing shares
   the existing capture session; browser processing shares the existing camera stream.

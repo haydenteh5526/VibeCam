@@ -96,7 +96,7 @@ export function LookBrowser({ active, photo, video, showAuto = false, onClose, o
           <Text style={s.footnote}>{video ? 'Photo samples shown. Video uses each look’s colour, without photo texture.' : 'Camera-inspired looks · illustrative sample scene'}</Text>
         </ScrollView>
         <View style={s.footer}>
-          <Text style={s.hint}>{photo ? 'Returns to your edit. Apply when you’re ready.' : 'Choose a look and get back to shooting.'}</Text>
+          <Text style={s.hint}>{photo ? 'Returns to your edit. Apply when you’re ready.' : video ? 'Use this colour look for your videos.' : 'Choose a look and get back to shooting.'}</Text>
           <Button label={`Use ${look.name}`} primary icon="checkmark" onPress={() => onSelect(camera)} />
         </View>
       </View>
