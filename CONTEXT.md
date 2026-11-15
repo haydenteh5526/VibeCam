@@ -16,7 +16,9 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 ## Workflow and state
 
 - Repository: haydenteh5526/VibeCam; default branch main.
-- Use codex/ feature branches, PRs and passing checks before merging.
+- Follow AGENTS.md for roles, branch names, PR rules and checks. specs/Tickets.md indexes
+  the GitHub issues; specs/Repo_Current_State.md records dated verification.
+  History up to PR #32 used codex/ branches.
 - Main requires typecheck, tests and ios-build; administrators are included.
 - Prior offline workflow PR #26 merged. Old draft PR #21 is closed; its prototype
   survives as tag archive/visioncamera-manual-controls-2026-07. Stale branches were removed.
