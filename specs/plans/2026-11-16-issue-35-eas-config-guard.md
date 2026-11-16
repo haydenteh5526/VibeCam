@@ -2,7 +2,7 @@
 
 > **For agentic workers:** implement this plan task by task, test first, in the order given. Steps use checkbox (`- [ ]`) syntax for tracking. If a step cannot be done as written, stop and return the plan to the Architect.
 
-**Status:** revision 1, written on 16 November 2026. Waiting for the owner's approval. Nothing in this plan is implemented.
+**Status:** revision 1, approved by the owner on 16 November 2026 with separate approvals A, B and C as recommended and design decisions 4 to 10 as written. Nothing in this plan is implemented.
 
 **Goal:** Make `npm test`, and therefore CI and `npm run check:release`, fail when a committed EAS build profile could ship with cloud features on, when the Xcode version EAS builds with differs from the one CI compiles with, or when the `preview` profile or the app identity is incomplete, so that no signed build or device pass is spent on a misconfigured binary.
 
@@ -21,6 +21,8 @@
 3. **No EAS build, no sign-in.** Nothing in this plan contacts Expo or Apple.
 
 ### Separate approvals
+
+All three were approved as recommended on 16 November 2026. The tasks implement the recommendation. The "if declined" and "alternative" notes record what the other choice would have changed.
 
 - **A. Variables stored on Expo's servers are outside the check, and the build guide gains one manual step for them.** *Recommended.* Each profile names an EAS environment (`development`, `preview`, `production`). Variables defined for those environments in the Expo dashboard are not in the repository, so no committed-file check can see them. The plan adds one sentence to `docs/DEPLOY.md` section 2: before building, open the project's Environment variables page and confirm `EXPO_PUBLIC_ENABLE_CLOUD_FEATURES` is not defined for `preview` or `production`. Which of the two sources wins when both define the variable was **not verified** for EAS CLI 24.11.0 during planning, so the step asks for absence, which is safe either way. *If declined:* the limit is recorded in the repository snapshot only, and the build guide is not changed for it.
 - **B. Every key under `build` is checked, including `base`.** *Recommended.* `eas build --profile base` is a valid command, so `base` is a profile that could be built. *Alternative:* check only `development`, `preview` and `production`. Declining B removes one loop and weakens the first acceptance check ("any build profile").
