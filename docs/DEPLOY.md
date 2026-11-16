@@ -20,8 +20,9 @@ build profile could ship with cloud features on, if the EAS and CI Xcode version
 differ, or if the preview profile or the app identity is incomplete. Apple requires
 the iOS 26 SDK or later for uploads from April 28, 2026. The SDK used to build the
 app is separate from its minimum supported iOS version; live colour requires iOS 16+,
-while older supported iPhones retain the raw viewfinder. See [Apple's requirement](https://developer.apple.com/news/?id=ueeok6yw)
-and [Expo's build images](https://docs.expo.dev/build-reference/infrastructure/).
+while older supported iPhones retain the raw viewfinder. See
+[Apple's requirement](https://developer.apple.com/news/?id=ueeok6yw) and
+[Expo's build images](https://docs.expo.dev/build-reference/infrastructure/).
 
 ## 2. Sign in and verify project access
 
@@ -40,7 +41,8 @@ resolve access before building; do not create an unrelated project or replace th
 
 The configuration check reads committed files only. Before building, open the
 project's Environment variables page on expo.dev and confirm that
-`EXPO_PUBLIC_ENABLE_CLOUD_FEATURES` is not defined for `preview` or `production`.
+`EXPO_PUBLIC_ENABLE_CLOUD_FEATURES` is not defined for any environment a profile
+uses: `development`, `preview` and `production`.
 
 An active Apple Developer Program membership and permission to manage signing for
 its team are required for the following physical-device cloud build. A free Apple
