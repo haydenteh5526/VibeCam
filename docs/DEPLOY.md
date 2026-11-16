@@ -81,7 +81,7 @@ Use airplane mode to verify that during the device walkthrough.
 
 ## 5. Test the installed build
 
-Record **Settings -> Version / Build**, the iPhone model and iOS version when
+Share **Settings -> Build details** and add the iPhone model when
 reporting an issue. Follow the full [physical iPhone checklist](RELEASE_READINESS.md#required-physical-iphone-walkthrough).
 Start with:
 
