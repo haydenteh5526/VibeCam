@@ -51,7 +51,7 @@ iPhone-shaped test launcher; it does not emulate native iOS hardware or Photos.
 - macOS CI: builds a colour sweep from the independent CPU reference and executes
   `LookCube.swift` using Core Image, checks portrait/landscape pixel buffers through
   the Metal presentation path (including all four corners), then compiles the unsigned
-  iOS Simulator app. The native test caught and verified the fix for a vertical flip.
+  iPhone Release app. The native test caught and verified the fix for a vertical flip.
 - Browser walkthrough: real frame changes, six looks, comparison, capture, compact
   screens, repeated toggles, camera flip, failure fallback and recovery.
 - Required before shipping: physical iPhone view hierarchy/attachment, orientation,

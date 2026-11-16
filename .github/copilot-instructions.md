@@ -1,36 +1,10 @@
 # Copilot Instructions for VibeCam
 
-## Session Startup
+Follow [AGENTS.md](../AGENTS.md). It holds the working guide, product constraints, roles, branch and PR rules, and the verification commands.
 
-- Read docs/PROJECT_CONTEXT.md and README.md first.
-- Assume branch mvp unless the user asks to switch.
-- Prefer small, production-oriented changes.
-
-## Repository Conventions
-
-- Monorepo layout: mobile/ and backend/.
-- Mobile workflow uses a custom dev client; do not default to Expo Go.
-- Keep backend API code strongly typed with Pydantic models and Python type hints.
-- Preserve the current /health response contract:
-  - status
-  - service
-  - timestamp_utc
-
-## Environment and Command Conventions
-
-- Run backend commands from backend/.
-- Run mobile commands from mobile/.
-- Reuse the user's selected Python environment unless they explicitly ask to recreate it.
-- On Windows, avoid PowerShell > for generated lock/list text files. Use cmd redirection or explicit UTF-8 output.
-
-## Validation Checklist
-
-- After backend changes, run and verify GET /health.
-- After dependency/output file generation, ensure files are UTF-8 plain text.
-- Re-run diagnostics and fix new errors introduced by the change.
-
-## Documentation Rule
-
-- If setup, behavior, or workflow changes, update both:
-  - README.md
-  - docs/PROJECT_CONTEXT.md
+- Work from `main` through a feature branch and a pull request. The `mvp` branch is retired.
+- Read [CONTEXT.md](../CONTEXT.md) and [release readiness](../docs/RELEASE_READINESS.md) first. `docs/PROJECT_CONTEXT.md` is a historical log.
+- Run backend commands from `backend/` and mobile commands from `mobile/`. Reuse the selected Python environment unless asked to recreate it.
+- The mobile app needs a custom build for its native module. Do not use Expo Go to validate it.
+- Keep backend API code typed with Pydantic models and type hints, and keep the `/health` response contract: `status`, `service`, `timestamp_utc`.
+- On Windows, write generated text files as UTF-8 and avoid PowerShell `>` redirection for them.
