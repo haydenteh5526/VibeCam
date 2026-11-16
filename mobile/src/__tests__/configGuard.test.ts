@@ -75,6 +75,11 @@ function brokenCopies(): Record<string, ConfigInput> {
   make('preview ios development client', c => { c.eas.build.preview.ios = { developmentClient: true }; });
   make('preview ios distribution', c => { c.eas.build.preview.ios = { distribution: 'store' }; });
   make('base ios development client', c => { c.eas.build.base.ios.developmentClient = true; });
+  make('preview development client string', c => { c.eas.build.preview.developmentClient = 'true'; });
+  make('preview ios development client string', c => { c.eas.build.preview.ios = { developmentClient: 'true' }; });
+  make('preview ios simulator string', c => { c.eas.build.preview.ios = { simulator: 'True' }; });
+  make('preview ios debug build', c => { c.eas.build.preview.ios = { buildConfiguration: 'Debug' }; });
+  make('preview debug build', c => { c.eas.build.preview.buildConfiguration = 'Debug'; });
   for (const path of IDENTITY_PATHS) {
     [['empty', ''], ['blank', '   '], ['number', 42]].forEach(([label, value]) =>
       make(`identity ${label} ${path}`, c => { const [node, key] = parent(c.app, path); node[key] = value; }));
@@ -235,6 +240,31 @@ test('preview must be an internal standalone profile', () => {
   c = copy();
   delete c.eas.build.preview.distribution;
   c.eas.build.preview.ios = { distribution: 'internal' };
+  assert.deepEqual(lines(c), []);
+
+  // EAS converts the string "true" to true before it resolves a profile.
+  c = copy();
+  c.eas.build.preview.developmentClient = 'true';
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.developmentClient: is "true"; preview must be a standalone app`]);
+
+  c = copy();
+  c.eas.build.preview.ios = { developmentClient: 'true' };
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.ios.developmentClient: is "true"; preview must be a standalone app`]);
+
+  c = copy();
+  c.eas.build.preview.ios = { simulator: 'True' };
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.ios.simulator: is "True"; preview must install on an iPhone`]);
+
+  c = copy();
+  c.eas.build.preview.ios = { buildConfiguration: 'Debug' };
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.ios.buildConfiguration: is "Debug"; preview must be a Release build`]);
+
+  c = copy();
+  c.eas.build.preview.buildConfiguration = 'Debug';
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.buildConfiguration: is "Debug"; preview must be a Release build`]);
+
+  c = copy();
+  c.eas.build.preview.ios = { buildConfiguration: 'Release', developmentClient: false, simulator: false };
   assert.deepEqual(lines(c), []);
 
   assert.equal(COMMITTED.eas.build.development.developmentClient, true);

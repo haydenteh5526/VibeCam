@@ -6,8 +6,10 @@
 // keys, while `env`, `ios` and `android` are merged key by key. For the preview
 // rule the keys under the resolved `ios` section are then applied over the common
 // keys, as `resolveBuildProfile` does for an iOS build. This is a model of that
-// code, not a copy: EAS also refuses `extends` chains of five or more, and this
-// check follows any depth.
+// code, not a copy: EAS validates and converts values before it resolves (the
+// string "true" becomes true, so the preview rule accepts only absent or the
+// literal value it wants), applies defaults afterwards, and refuses `extends`
+// chains of five or more, while this check follows any depth.
 
 export type ConfigProblem = {
   /** Path from the repository root. */
@@ -157,8 +159,10 @@ export function checkBuildConfig(input: ConfigInput): ConfigProblem[] {
     if (distribution.value === undefined) add(preview, EAS, distribution.where, 'is not set; it must be "internal"');
     else if (distribution.value !== 'internal') add(preview, EAS, distribution.where, `is ${show(distribution.value)}; it must be "internal"`);
     const developmentClient = source('developmentClient');
-    if (developmentClient.value === true) add(preview, EAS, developmentClient.where, 'is true; preview must be a standalone app');
-    if (ios.simulator === true) add(preview, EAS, 'build.preview.ios.simulator', 'is true; preview must install on an iPhone');
+    if (developmentClient.value !== undefined && developmentClient.value !== false) add(preview, EAS, developmentClient.where, `is ${show(developmentClient.value)}; preview must be a standalone app`);
+    if (ios.simulator !== undefined && ios.simulator !== false) add(preview, EAS, 'build.preview.ios.simulator', `is ${show(ios.simulator)}; preview must install on an iPhone`);
+    const buildConfiguration = source('buildConfiguration');
+    if (buildConfiguration.value !== undefined && buildConfiguration.value !== 'Release') add(preview, EAS, buildConfiguration.where, `is ${show(buildConfiguration.value)}; preview must be a Release build`);
   }
 
   // App identity and the four usage descriptions.
