@@ -126,8 +126,10 @@ This is a tested development foundation, not yet a device-verified App Store bin
 
 ## Required physical iPhone walkthrough
 
-Use a signed standalone preview build, including the local video module; follow
-[the Windows build guide](DEPLOY.md). Share **Settings -> Build details** and add the
+Use a signed standalone build that includes the local video module: the EAS preview
+([build guide](DEPLOY.md)) or a Release build from a Mac
+([Mac route](DEPLOY.md#build-on-a-mac-without-a-paid-membership)), installed less than
+7 days earlier. Share **Settings -> Build details** and add the
 iPhone model with each result.
 
 1. Deny camera, open Film Roll and import. Enable camera in Settings and return.

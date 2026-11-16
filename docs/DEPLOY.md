@@ -26,6 +26,10 @@ while older supported iPhones retain the raw viewfinder. See
 
 ## 2. Sign in and verify project access
 
+Without an Apple Developer Program membership, use
+[Build on a Mac without a paid membership](#build-on-a-mac-without-a-paid-membership)
+instead of sections 2 to 4.
+
 Run these in an interactive terminal; keep passwords and verification codes there:
 
 ```powershell
@@ -86,6 +90,65 @@ Use airplane mode to verify that during the device walkthrough.
   changes over time, so do not use it to validate this release.
 - Do not uninstall an existing preview just to update it: save any wanted items to
   Photos first. Uninstalling deletes that app's Film Roll.
+
+## Build on a Mac without a paid membership
+
+Use this route when there is no Apple Developer Program membership. It needs a Mac and
+cannot be done from Windows. It builds VibeCam on the Mac and signs it with a free
+Apple ID.
+
+It needs:
+
+- a Mac, Apple silicon or Intel, that runs macOS 15.6 or later and has at least 40 GB
+  free;
+- Xcode 26.2 from Apple's developer downloads, with the iOS platform installed;
+- Node 20 and CocoaPods;
+- a free Apple ID, added in Xcode -> Settings -> Accounts;
+- the iPhone and its cable.
+
+It gives a signed Release build with the JavaScript embedded, installed only on phones
+connected to that Mac. The app stops opening 7 days after installation, so run a device
+pass on an install less than 7 days old. There is no TestFlight or App Store build.
+**Settings -> Build details** reads `Install: Development signing`.
+
+On the Mac, build a commit on `main` from a clean checkout:
+
+```bash
+git clone https://github.com/haydenteh5526/VibeCam.git
+cd VibeCam
+git checkout <commit on main>
+cd mobile
+npm ci
+npm run check:release
+```
+
+Connect and unlock the iPhone, trust the Mac, and turn on Developer Mode when iOS
+offers it (Settings -> Privacy & Security). Then build and install:
+
+```bash
+npx expo run:ios --device --configuration Release
+```
+
+Choose the iPhone and the personal team when asked. On the iPhone, trust the developer
+under Settings -> General -> VPN & Device Management; that verification needs a network
+connection. Open the app once while online. Use airplane mode only after that.
+
+- If the command cannot sign or select the device, open `ios/VibeCam.xcworkspace` in
+  Xcode, choose the personal team under Signing & Capabilities, set the Run scheme's
+  Build Configuration to Release, select the iPhone and press Run. Both routes produce
+  the same kind of build.
+- If signing fails because the bundle identifier is unavailable, open
+  `ios/VibeCam.xcworkspace`, change the bundle identifier under Signing & Capabilities
+  to `com.<your-apple-id-name>.vibecam.local`, keep the Release configuration and run
+  from Xcode. Do not change `app.json`: the generated `ios/` folder is ignored by Git,
+  so the change stays on the Mac. The app then installs as a separate app with its own
+  empty Film Roll.
+- Do not commit anything from `ios/`. After the build, `git status` should show no
+  change outside it.
+
+Record the full commit hash, the macOS and Xcode versions, the bundle identifier used,
+the install date and the date the app stops opening (install date plus 7 days), and the
+**Build details** text shared from Settings.
 
 ## 5. Test the installed build
 
