@@ -2,7 +2,7 @@
 
 > **For agentic workers:** implement this plan task by task, test first, in the order given. Steps use checkbox (`- [ ]`) syntax for tracking. If a step cannot be done as written, stop and return the plan to the Architect.
 
-**Status:** revision 1, 15 November 2026. **Awaiting owner approval.** Nothing in this plan is implemented.
+**Status:** revision 1, approved by the owner on 16 November 2026 with separate approvals A, B and C as recommended and design decisions 4 to 9 as written. Nothing in this plan is implemented.
 
 **Goal:** Let the person testing VibeCam open `Build details` in Settings, read exactly which build is installed (version, build number, install type, system version, video looks, live colour, cloud state) and share that text, so every device result names its build.
 
@@ -22,7 +22,7 @@
 
 ### Separate approvals
 
-Each can be approved or declined on its own. The tasks implement the recommendation. If one is declined, the plan comes back to the Architect for revision before Build starts.
+All three were approved as recommended on 16 November 2026. The tasks implement the recommendation. The "if declined" notes record what the alternative would have changed.
 
 - **A. The report does not include the iPhone model.** *Recommended.* React Native does not expose the model, and reading it needs `expo-device`, a new native dependency added just before the first signed build. The tester writes the model in the device-pass issue. *If declined:* add `expo-device` at the SDK 54 version, add a line `Device: <model name> (<model id>)` after `System`, and add its tests. Affects Tasks 1 and 2 and adds a dependency review.
 - **B. The report does not include the Git commit.** *Recommended.* The EAS build page already records the commit for a build number, and embedding it means replacing the static `app.json` with a dynamic config, which touches the build configuration. *If declined:* this becomes a separate issue, not part of this plan.
