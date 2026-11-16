@@ -5,6 +5,10 @@ This is a tested development foundation, not yet a device-verified App Store bin
 
 ## Implemented
 
+- Settings has a closed `Build details` control. Opened, it shows the version and build,
+  install type, development bundle, system version, video looks, live colour and cloud
+  state, read from the running app. On iPhone, `Share build report` shares the same text.
+  Checked in a browser only; the share sheet and install type need the signed build.
 - A consistent pocket-camera interface, accessible labelled controls, safe areas,
   responsive viewfinder and compact camera selector on short screens.
 - Photo/video mode, actual hardware lens choices when available, flash/torch, timer
@@ -123,8 +127,8 @@ This is a tested development foundation, not yet a device-verified App Store bin
 ## Required physical iPhone walkthrough
 
 Use a signed standalone preview build, including the local video module; follow
-[the Windows build guide](DEPLOY.md). Record Settings' Version/Build, device model
-and iOS version with each result.
+[the Windows build guide](DEPLOY.md). Share **Settings -> Build details** and add the
+iPhone model with each result.
 
 1. Deny camera, open Film Roll and import. Enable camera in Settings and return.
 2. Capture an asymmetric chart in portrait/landscape, front/back and each available

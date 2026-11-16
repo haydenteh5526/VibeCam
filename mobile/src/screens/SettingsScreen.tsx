@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import * as Haptics from 'expo-haptics';
 import * as Application from 'expo-application';
 import appConfig from '../../app.json';
+import { BuildDetails } from '../components/BuildDetails';
 import { CameraPicker } from '../components/CameraPicker';
 import { IconButton, Notice, theme, ui, useScreenInsets } from '../components/ui';
 import type { Settings } from '../settings';
@@ -52,6 +53,7 @@ export function SettingsScreen({ settings, onChange, onClose, error = '', cloudE
       <View style={s.about}><Text style={s.aboutBrand}>vibecam</Text><Text style={s.aboutText}>A pocket full of possibilities.</Text><Text style={s.aboutNote}>Camera looks are inspired interpretations of colour and texture. Your iPhone's lens, sensor, light and flash still shape the image.</Text>
         <Text selectable style={s.version}>Version {version}{build ? ` · Build ${build}` : ''}</Text>
         <Text style={s.version}>{cloudEnabled ? 'Cloud development enabled' : 'No account. No uploads.'}</Text>
+        <BuildDetails />
       </View>
     </ScrollView>
   </View>;

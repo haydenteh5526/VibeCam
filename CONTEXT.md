@@ -66,6 +66,9 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 - src/rollRepository.ts serializes durable commits. Original, rendered image and poster
   are retained before the index is written; only unreferenced owned files are removed afterward.
   Favourites, saved status and recipes survive restart. Bulk deletion commits once.
+- src/buildReport.ts formats the seven-line build report (pure), src/buildInfo.ts reads its
+  facts from the running app, and BuildDetails in Settings shows and shares it. No network,
+  permission or storage.
 - src/services/storage.ts uses app documents on native and IndexedDB on web.
 - CameraScreen remembers settings.videoSound separately from microphone authorization.
   Video mode is silent until authorized and enabled; Sound is the explicit permission
