@@ -61,6 +61,29 @@ function brokenCopies(): Record<string, ConfigInput> {
   make('preview missing', c => { delete c.eas.build.preview; });
   for (const path of IDENTITY_PATHS) make('identity ' + path, c => { const [node, key] = parent(c.app, path); delete node[key]; });
   make('no profiles', c => { c.eas = { build: {} }; });
+
+  // The rest of the inputs asserted in tests 2 to 8 and 10.
+  [[false, 'false'], ['False', 'False'], ['0', '0'], ['', 'empty']].forEach(([value, label]) =>
+    make('preview cloud ' + label, c => { c.eas.build.preview.env = { [KEY]: value }; }));
+  make('adhoc profile', c => { c.eas.build.adhoc = { distribution: 'internal' }; });
+  make('chain through mid', c => { c.eas.build.mid = { extends: 'base', env: { [KEY]: 'true' } }; c.eas.build.preview.extends = 'mid'; });
+  make('production image 26.3', c => { c.eas.build.production.ios = { image: 'macos-sequoia-15.6-xcode-26.3' }; });
+  make('base ios deleted', c => { delete c.eas.build.base.ios; });
+  make('ci line removed', c => { c.workflow = c.workflow.replace(/^.*DEVELOPER_DIR:.*\r?\n/m, ''); });
+  make('preview distribution deleted', c => { delete c.eas.build.preview.distribution; });
+  make('base development client', c => { c.eas.build.base.developmentClient = true; });
+  make('preview ios development client', c => { c.eas.build.preview.ios = { developmentClient: true }; });
+  make('preview ios distribution', c => { c.eas.build.preview.ios = { distribution: 'store' }; });
+  make('base ios development client', c => { c.eas.build.base.ios.developmentClient = true; });
+  for (const path of IDENTITY_PATHS) {
+    [['empty', ''], ['blank', '   '], ['number', 42]].forEach(([label, value]) =>
+      make(`identity ${label} ${path}`, c => { const [node, key] = parent(c.app, path); node[key] = value; }));
+  }
+  make('expo.ios deleted', c => { delete c.app.expo.ios; });
+  make('expo.extra deleted', c => { delete c.app.expo.extra; });
+  [null, [], 7, {}, { build: 3 }, { build: { preview: 5 } }].forEach((eas, i) => make('malformed eas ' + i, c => { c.eas = eas; }));
+  [null, [], {}].forEach((app, i) => make('malformed app ' + i, c => { c.app = app; }));
+  make('empty workflow', c => { c.workflow = ''; });
   return out;
 }
 
@@ -195,6 +218,24 @@ test('preview must be an internal standalone profile', () => {
   c = copy();
   c.eas.build.preview.ios = { simulator: true };
   assert.deepEqual(lines(c), [`${EAS}: build.preview.ios.simulator: is true; preview must install on an iPhone`]);
+
+  // The iOS section overrides the common keys for an iOS build.
+  c = copy();
+  c.eas.build.preview.ios = { developmentClient: true };
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.ios.developmentClient: is true; preview must be a standalone app`]);
+
+  c = copy();
+  c.eas.build.preview.ios = { distribution: 'store' };
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.ios.distribution: is "store"; it must be "internal"`]);
+
+  c = copy();
+  c.eas.build.base.ios.developmentClient = true;
+  assert.deepEqual(lines(c), [`${EAS}: build.preview.ios.developmentClient: is true; preview must be a standalone app`]);
+
+  c = copy();
+  delete c.eas.build.preview.distribution;
+  c.eas.build.preview.ios = { distribution: 'internal' };
+  assert.deepEqual(lines(c), []);
 
   assert.equal(COMMITTED.eas.build.development.developmentClient, true);
   assert.deepEqual(lines(COMMITTED), []);

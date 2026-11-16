@@ -1,9 +1,13 @@
 // Checks the committed build configuration. Pure: it imports nothing, reads no
 // file and no environment variable. The test passes everything in.
 //
-// `extends` is resolved the way @expo/eas-json 24.9.0 (the version EAS CLI
-// 24.11.0 depends on) resolves it: a profile's own keys replace its base's keys,
-// while `env`, `ios` and `android` are merged key by key.
+// `extends` is resolved with the same merge rule as @expo/eas-json 24.9.0 (the
+// version EAS CLI 24.11.0 depends on): a profile's own keys replace its base's
+// keys, while `env`, `ios` and `android` are merged key by key. For the preview
+// rule the keys under the resolved `ios` section are then applied over the common
+// keys, as `resolveBuildProfile` does for an iOS build. This is a model of that
+// code, not a copy: EAS also refuses `extends` chains of five or more, and this
+// check follows any depth.
 
 export type ConfigProblem = {
   /** Path from the repository root. */
@@ -144,10 +148,17 @@ export function checkBuildConfig(input: ConfigInput): ConfigProblem[] {
   if (names.length > 0 && !has(build, 'preview')) add(preview, EAS, 'build.preview', 'is missing');
   const previewProfile = resolved.find(entry => entry.name === 'preview')?.profile;
   if (previewProfile) {
-    if (previewProfile.distribution === undefined) add(preview, EAS, 'build.preview.distribution', 'is not set; it must be "internal"');
-    else if (previewProfile.distribution !== 'internal') add(preview, EAS, 'build.preview.distribution', `is ${show(previewProfile.distribution)}; it must be "internal"`);
-    if (previewProfile.developmentClient === true) add(preview, EAS, 'build.preview.developmentClient', 'is true; preview must be a standalone app');
-    if (isObj(previewProfile.ios) && previewProfile.ios.simulator === true) add(preview, EAS, 'build.preview.ios.simulator', 'is true; preview must install on an iPhone');
+    // For an iOS build the `ios` section overrides the common keys. Name the section the value came from.
+    const ios: Obj = isObj(previewProfile.ios) ? previewProfile.ios : {};
+    const source = (key: string) => has(ios, key)
+      ? { value: ios[key], where: `build.preview.ios.${key}` }
+      : { value: previewProfile[key], where: `build.preview.${key}` };
+    const distribution = source('distribution');
+    if (distribution.value === undefined) add(preview, EAS, distribution.where, 'is not set; it must be "internal"');
+    else if (distribution.value !== 'internal') add(preview, EAS, distribution.where, `is ${show(distribution.value)}; it must be "internal"`);
+    const developmentClient = source('developmentClient');
+    if (developmentClient.value === true) add(preview, EAS, developmentClient.where, 'is true; preview must be a standalone app');
+    if (ios.simulator === true) add(preview, EAS, 'build.preview.ios.simulator', 'is true; preview must install on an iPhone');
   }
 
   // App identity and the four usage descriptions.
