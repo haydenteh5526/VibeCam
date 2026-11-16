@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Task 1 is documentation an Issue session can build now. Tasks 2 and 3 are the owner's steps in January 2027, with the Architect recording the evidence. If a step cannot be done as written, stop and return the plan to the Architect.
 
-**Status:** revision 1, written on 16 November 2026. Waiting for the owner's approval. Nothing in this plan is done.
+**Status:** revision 1, approved by the owner on 16 November 2026 with separate approvals A, B, C and D as recommended and design decisions 5 to 8 as written. Nothing in this plan is done.
 
 **Goal:** Install a signed, standalone VibeCam on the owner's iPhone without a paid Apple Developer Program membership, by building it locally on the owner's M1 MacBook Air with a free Apple ID, and record its identity so the device passes #37, #38 and #39 and the remaining check of #34 can run against a known build.
 
