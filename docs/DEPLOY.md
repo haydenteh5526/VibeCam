@@ -17,10 +17,10 @@ npm run check:release
 The npm scripts use EAS CLI 24.11.0. `eas.json` pins Xcode 26.2 for iOS, including
 preview and production. `npm test`, and so `npm run check:release` and CI, fails if a
 build profile could ship with cloud features on, if the EAS and CI Xcode versions
-differ, or if the preview profile or the app identity is incomplete. Apple requires the iOS 26 SDK or later for uploads from
-April 28, 2026. The SDK used to build the app is separate from its minimum supported
-iOS version; live colour requires iOS 16+, while older supported iPhones retain the
-raw viewfinder. See [Apple's requirement](https://developer.apple.com/news/?id=ueeok6yw)
+differ, or if the preview profile or the app identity is incomplete. Apple requires
+the iOS 26 SDK or later for uploads from April 28, 2026. The SDK used to build the
+app is separate from its minimum supported iOS version; live colour requires iOS 16+,
+while older supported iPhones retain the raw viewfinder. See [Apple's requirement](https://developer.apple.com/news/?id=ueeok6yw)
 and [Expo's build images](https://docs.expo.dev/build-reference/infrastructure/).
 
 ## 2. Sign in and verify project access
