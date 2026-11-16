@@ -15,11 +15,14 @@ npm run check:release
 ```
 
 The npm scripts use EAS CLI 24.11.0. `eas.json` pins Xcode 26.2 for iOS, including
-preview and production. Apple requires the iOS 26 SDK or later for uploads from
-April 28, 2026. The SDK used to build the app is separate from its minimum supported
-iOS version; live colour requires iOS 16+, while older supported iPhones retain the
-raw viewfinder. See [Apple's requirement](https://developer.apple.com/news/?id=ueeok6yw)
-and [Expo's build images](https://docs.expo.dev/build-reference/infrastructure/).
+preview and production. `npm test`, and so `npm run check:release` and CI, fails if a
+build profile could ship with cloud features on, if the EAS and CI Xcode versions
+differ, or if the preview profile or the app identity is incomplete. Apple requires
+the iOS 26 SDK or later for uploads from April 28, 2026. The SDK used to build the
+app is separate from its minimum supported iOS version; live colour requires iOS 16+,
+while older supported iPhones retain the raw viewfinder. See
+[Apple's requirement](https://developer.apple.com/news/?id=ueeok6yw) and
+[Expo's build images](https://docs.expo.dev/build-reference/infrastructure/).
 
 ## 2. Sign in and verify project access
 
@@ -35,6 +38,11 @@ The configured project belongs to `hayyyyy`, has ID
 `054f74da-a7ed-4340-84cb-eb5f257ae716`, and uses bundle ID `com.vibecam.app`.
 Use that Expo account or one granted access to its project. If project access fails,
 resolve access before building; do not create an unrelated project or replace the ID.
+
+The configuration check reads committed files only. Before building, open the
+project's Environment variables page on expo.dev and confirm that
+`EXPO_PUBLIC_ENABLE_CLOUD_FEATURES` is not defined for any environment a profile
+uses: `development`, `preview` and `production`.
 
 An active Apple Developer Program membership and permission to manage signing for
 its team are required for the following physical-device cloud build. A free Apple

@@ -86,6 +86,8 @@ npm run test:gpu serves the real shader check on localhost:8082; press Run GPU c
 npm run test:camera serves a separate CameraScreen interaction harness on 127.0.0.1:8083;
 press Run checks. Device/audio responses are simulated; no real video or Film Roll writes.
 npx expo export --platform all checks bundles. npx expo-doctor checks dependencies.
+npm test also runs tools/config-guard.ts over eas.json, app.json and the mobile workflow:
+cloud features off in every profile, one Xcode version in EAS and CI, preview and identity.
 GitHub macOS CI checks the actual Core Image LUT against 4,096 colours per table and
 compiles an unsigned iPhone Release build with Xcode 26.2/iOS 26 SDK and an embedded
 JavaScript bundle; it does not validate real camera,
