@@ -11,11 +11,13 @@ export function BuildDetails({ read = readBuildInfo }: { read?: () => Promise<Bu
   const [sharing, setSharing] = React.useState(false);
   const [shareFailed, setShareFailed] = React.useState(false);
   const request = React.useRef(0);
+  const sharingRef = React.useRef(false);
   React.useEffect(() => () => { request.current += 1; }, []);
 
   const toggle = () => {
     const id = ++request.current;
     setText(null); setUnavailable(false); setShareFailed(false);
+    sharingRef.current = false; setSharing(false);
     if (open) { setOpen(false); return; }
     setOpen(true);
     read().then(
@@ -24,13 +26,16 @@ export function BuildDetails({ read = readBuildInfo }: { read?: () => Promise<Bu
     );
   };
   const share = () => {
-    if (text === null || sharing) return;
+    if (text === null || sharingRef.current) return;
     const id = request.current;
+    sharingRef.current = true;
     setShareFailed(false); setSharing(true);
-    Share.share({ message: text }).then(
-      () => {},
-      () => { if (request.current === id) setShareFailed(true); },
-    ).finally(() => setSharing(false));
+    const settle = (failed: boolean) => {
+      if (request.current !== id) return;
+      sharingRef.current = false; setSharing(false);
+      if (failed) setShareFailed(true);
+    };
+    Share.share({ message: text }).then(() => settle(false), () => settle(true));
   };
 
   return <View style={s.wrap}>
