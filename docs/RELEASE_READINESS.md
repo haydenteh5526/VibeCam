@@ -54,6 +54,10 @@ This is a tested development foundation, not yet a device-verified App Store bin
 - Offline builds disable all backend traffic and hide AI, uploads, Auto scene selection,
   frames, dust and light leaks. Date stamps now work offline for photos.
   EXPO_PUBLIC_ENABLE_CLOUD_FEATURES=true remains a developer-only opt-in.
+- The build configuration is guarded by a unit test in `npm test`: every EAS build
+  profile sets cloud features to "false", the EAS and CI Xcode versions match, and the
+  preview profile and app identity are complete. Variables stored on Expo's servers are
+  outside it.
 
 ## Verification
 

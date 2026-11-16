@@ -36,6 +36,7 @@ Results in [release readiness](../docs/RELEASE_READINESS.md#verification) dated 
 - **Unknown until measured on a device.** The exported size of a portrait clip (the exporter uses the 1280x720 preset). Full-resolution Apply on a large import: the renderer refuses a source wider or taller than the GPU texture limit and keeps the original (`mobile/src/look/renderFrame.ts`).
 - **Looks are interpretations.** No paired-shot calibration exists. See [camera fidelity](../docs/CAMERA_CALIBRATION.md).
 - **Dependencies.** The audit count above differs from the 41 recorded on 6 October and has not been reviewed. Several fixes are expected to need an Expo major-version migration, which is separate work.
+- **Build configuration check (issue #35, on a branch).** `npm test` checks the committed `eas.json`, `app.json` and mobile workflow. It cannot see variables stored on Expo's servers for the `development`, `preview` and `production` environments, a build started with a command-line override, or whether the named EAS image really contains that Xcode. The build guide asks the owner to check the Environment variables page before building.
 - **Cloud features** stay outside v1 and are not release-ready.
 
 ## Observations with no issue yet
