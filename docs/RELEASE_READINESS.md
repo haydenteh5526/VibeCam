@@ -52,7 +52,8 @@ This is a tested development foundation, not yet a device-verified App Store bin
   failed index writes preserve the previous version. Browser downloads can be retried.
 - On iPhone, Import offers the Photos library, HEIC included, as well as Files. The
   system picker needs no Photos permission, and a Photos import is stored as an upright
-  JPEG. Checked in a browser and unit tests only; Photos and HEIC need the iPhone (walkthrough step 1).
+  JPEG. Unit tests cover the import decisions with fake pickers, and the browser check
+  covers only the web Files import. Photos and HEIC need the iPhone (walkthrough step 1).
 - Photos saving requests add-only permission. Import and Film Roll remain available
   without camera permission. Camera timers cancel and playback pauses on backgrounding.
 - Native video: six colour LUTs, up to 15 seconds, 720p, original retention, restyling,
