@@ -2,7 +2,7 @@
 
 > **For agentic workers:** implement this plan task by task, test first, in the order given. Steps use checkbox (`- [ ]`) syntax for tracking. If a step cannot be done as written, stop and return the plan to the Architect.
 
-**Status:** revision 1, written on 17 November 2026. Waiting for the owner's approval. Nothing in this plan is implemented.
+**Status:** revision 1, approved by the owner on 17 November 2026 with separate approvals A and B as recommended and design decisions 3 to 7 as written. Nothing in this plan is implemented.
 
 **Goal:** When Film Roll loads and an entry's developed file is gone but its original is still on disk, keep the entry, showing the original and leaving it editable, so a lost file never leaves an original on disk with nothing pointing to it.
 
