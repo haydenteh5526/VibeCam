@@ -2,7 +2,7 @@
 
 > **For agentic workers:** work through this plan task by task, in the order given. Steps use checkbox (`- [ ]`) syntax for tracking. If a step cannot be done as written, or a result contradicts what this plan expects, stop and return the plan to the Architect.
 
-**Status:** revision 2, approved by the owner on 17 November 2026. Revision 2 replaces `npm audit fix` with targeted updates after Task 1 showed it moves Expo versions. Approvals A and C and decisions 5 to 7 stand from revision 1.
+**Status:** revision 3, approved by the owner on 17 November 2026. Revision 3 lets `expo-asset` move from 12.0.13 to `~12.0.14` so `expo install --check` passes, because Expo's expected SDK 54 version moved and the check also fails on `main`. Revision 2 replaced `npm audit fix` with targeted updates. Approvals A and C and decisions 5 to 7 stand from revision 1.
 
 **Goal:** Know, with evidence, which of the 25 `npm audit` advisories in `mobile/` reach the app that ships, apply every fix that needs no Expo SDK change, and give the owner the facts to decide whether an Expo upgrade must happen before the January 2027 build.
 
@@ -44,7 +44,7 @@ Run on `main` at `aad3016`, 17 November 2026, Windows 11, `npm audit --json` and
 
 ### Design decisions to confirm
 
-4. **Fixes go through targeted updates of the lockfile.** On the clean lockfile run `npm update shell-quote node-forge undici source-map-js sharp`. Also try `npm update fast-uri`; keep it only if nothing else moves. No `npm audit fix` in any form. `package.json` changes only for `sharp`'s range if npm rewrites it, and for approval A. `expo` stays at 54.0.37 and every `expo-*` package, `react` and `react-native` keep their exact installed versions; Task 2 proves it with a before and after listing, and also shows that no `node_modules/expo/node_modules/expo` or other SDK 58 package is in the lockfile.
+4. **Fixes go through targeted updates of the lockfile.** On the clean lockfile run `npm update shell-quote node-forge undici source-map-js sharp`. Also try `npm update fast-uri`; keep it only if nothing else moves. No `npm audit fix` in any form. `package.json` changes only for `sharp`'s range if npm rewrites it, and for approval A. `expo` stays at 54.0.37 and every `expo-*` package, `react` and `react-native` keep their exact installed versions; Task 2 proves it with a before and after listing, and also shows that no `node_modules/expo/node_modules/expo` or other SDK 58 package is in the lockfile. Exception (revision 3): `expo-asset` moves to 12.0.14 with `npm install expo-asset@~12.0.14`, and `package.json` reads `"expo-asset": "~12.0.14"`. Never `npm update expo-asset`, which pulls in SDK 58.
 - **New decision (revision 2).** `postcss` (pinned `~8.4.32` by `@expo/metro-config`) and `image-size` (pinned `^1.0.2` by `metro`) stay unfixed. No `overrides` (approval C stands). They are listed with their risk as Decision 7 says: both run only at build time on a developer machine or CI, on the project's own styles and assets, and neither is in an exported bundle or the native app.
 - **Expected result, to be replaced by what is observed:** 0 critical, 2 high, the rest moderate, all tooling. The PR states that no Expo SDK upgrade is needed before the January build and that the remaining advisories wait for a future SDK upgrade, which the Architect raises as its own issue.
 5. **Evidence that a package is not in the app** is its absence from the `sources` of the source maps of a production export for iOS, Android and web. A dependency path alone is not accepted as evidence.
@@ -54,7 +54,7 @@ Run on `main` at `aad3016`, 17 November 2026, Windows 11, `npm audit --json` and
 ## Global Constraints
 
 - Branch `feature/issue-44-dependency-audit`, which holds this plan. PR to protected `main`. Do not merge.
-- Allowed changes: `mobile/package-lock.json`, `mobile/package.json` (only as Decision 4 and approval A allow), `specs/Repo_Current_State.md`, `specs/Tickets.md`, and, with approval A, any document that mentions `go:tunnel`. Nothing under `mobile/src/`, `mobile/modules/`, `.github/`, and no change to `app.json` or `eas.json`.
+- Allowed changes: `mobile/package-lock.json`, `mobile/package.json` (only as Decision 4, its revision 3 exception and approval A allow), `specs/Repo_Current_State.md`, `specs/Tickets.md`, and, with approval A, any document that mentions `go:tunnel`. Nothing under `mobile/src/`, `mobile/modules/`, `.github/`, and no change to `app.json` or `eas.json`.
 - Never run `npm audit fix --force`. Never change the Expo SDK, React or React Native version.
 - Do not start an EAS build or run any `eas` command.
 - No Claude or AI attribution in commits, PRs, issues or comments.
@@ -83,7 +83,7 @@ Run on `main` at `aad3016`, 17 November 2026, Windows 11, `npm audit --json` and
 
 - [ ] **Step 1:** Record `npm ls expo react react-native --depth=0` and the versions of every `expo-*` dependency.
 - [ ] **Step 2:** Run the targeted update of Decision 4 (never `npm audit fix`). With approval A, remove `@expo/ngrok` from `devDependencies` and the `go:tunnel` script, then `npm install` to update the lockfile.
-- [ ] **Step 3:** Repeat Step 1 and show the two listings are identical. `git diff --stat` shows only `package-lock.json`, and `package.json` only as allowed.
+- [ ] **Step 3:** Repeat Step 1 and show the two listings are identical. `git diff --stat` shows only `package-lock.json`, and `package.json` only as allowed. The only differences allowed are `expo-asset` 12.0.13 to 12.0.14 and the removed `@expo/ngrok` packages.
 - [ ] **Step 4:** Delete `node_modules`, run `npm ci`, then `npm run check:release`. Record the output and the test count.
 - [ ] **Step 5:** Run `npm run assets:video-luts` and confirm `git status` shows no change to `mobile/assets/`.
 - [ ] **Step 6:** With approval A, search the repository for `go:tunnel`, `--tunnel` and `ngrok` and update each mention.
