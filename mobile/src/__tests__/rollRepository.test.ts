@@ -135,3 +135,140 @@ test('bulk deletion is atomic and leaves shared originals until the last photo i
   assert.equal(f.disk().length, 0);
   assert.ok(!f.files.has(b.entry.originalUri!));
 });
+
+test('a photo whose developed file is missing falls back to its original', async () => {
+  const recipe = { amount: .8, exposure: .5, warmth: -.2, character: .75, dateStamp: true };
+  const f = fixture();
+  const { entry } = await f.repo.put({ ...shot(), favorite: true, savedToLibrary: true, recipe });
+  f.files.delete('documents/photo');
+  const [recovered, ...rest] = await createRollRepository(f.storage).load();
+  assert.equal(rest.length, 0);
+  assert.equal(recovered.uri, 'documents/original');
+  assert.equal(recovered.originalUri, 'documents/original');
+  assert.equal(recovered.cameraId, 'original');
+  assert.equal(recovered.cameraName, 'Original');
+  assert.equal(recovered.savedToLibrary, false);
+  assert.equal(recovered.favorite, true);
+  assert.deepEqual(recovered.recipe, recipe);
+  assert.equal(recovered.takenAt, entry.takenAt);
+  assert.equal(recovered.seed, entry.seed);
+  assert.deepEqual(f.disk(), [recovered]);
+  assert.deepEqual(f.removed, []);
+  assert.ok(f.files.has('documents/original'));
+
+  const moved = fixture([{ ...shot('old/photo', 'old/original'), favorite: true }]);
+  moved.files.add('documents/original');
+  moved.files.delete('old/original'); moved.files.delete('old/photo');
+  const rebased = createRollRepository({ ...moved.storage, resolve: async (uri: string) => uri.replace(/^old\//, 'documents/') });
+  const [resolved] = await rebased.load();
+  assert.equal(resolved.uri, 'documents/original');
+  assert.equal(resolved.originalUri, 'documents/original');
+  assert.deepEqual(moved.removed, []);
+});
+
+test('a clip whose styled file is missing falls back to its recording', async () => {
+  const f = fixture();
+  f.files.add('cache/clip.mp4'); f.files.add('cache/clip.mov'); f.files.add('cache/poster.jpg');
+  const clip: RollEntry = { ...shot('cache/clip.mp4', 'cache/clip.mov'),
+    mediaType: 'video', thumbnailUri: 'cache/poster.jpg', durationMs: 15_000 };
+  await f.repo.put(clip);
+  f.files.delete('documents/clip.mp4');
+  const [recovered] = await createRollRepository(f.storage).load();
+  assert.equal(recovered.uri, 'documents/clip.mov');
+  assert.equal(recovered.originalUri, 'documents/clip.mov');
+  assert.equal(recovered.mediaType, 'video');
+  assert.equal(recovered.durationMs, 15_000);
+  assert.equal(recovered.thumbnailUri, 'documents/poster.jpg');
+  assert.deepEqual(f.removed, []);
+
+  const g = fixture();
+  g.files.add('cache/clip.mp4'); g.files.add('cache/clip.mov'); g.files.add('cache/poster.jpg');
+  await g.repo.put(clip);
+  g.files.delete('documents/clip.mp4'); g.files.delete('documents/poster.jpg');
+  const [posterless] = await createRollRepository(g.storage).load();
+  assert.equal(posterless.uri, 'documents/clip.mov');
+  assert.equal(posterless.mediaType, 'video');
+  assert.equal(posterless.thumbnailUri, null);
+  assert.deepEqual(g.removed, []);
+});
+
+test('intact entries are unchanged beside a recovered one', async () => {
+  const f = fixture();
+  for (const name of ['a', 'b', 'c']) { f.files.add(`cache/${name}`); f.files.add(`cache/o${name}`); }
+  await f.repo.put({ ...shot('cache/a', 'cache/oa'), takenAt: 1 });
+  await f.repo.put({ ...shot('cache/b', 'cache/ob'), takenAt: 2 });
+  await f.repo.put({ ...shot('cache/c', 'cache/oc'), takenAt: 3 });
+  const before = await createRollRepository(f.storage).load();
+  assert.deepEqual(before.map(e => e.uri), ['documents/c', 'documents/b', 'documents/a']);
+  f.files.delete('documents/b');
+  const after = await createRollRepository(f.storage).load();
+  assert.equal(after.length, 3);
+  assert.deepEqual(after[0], before[0]);
+  assert.equal(after[1].uri, 'documents/ob');
+  assert.equal(after[1].takenAt, 2);
+  assert.deepEqual(after[2], before[2]);
+});
+
+test('entries that fall back to the same original become one entry', async () => {
+  const f = fixture();
+  f.files.add('cache/a'); f.files.add('cache/b'); f.files.add('cache/o');
+  await f.repo.put({ ...shot('cache/a', 'cache/o'), takenAt: 100 });
+  await f.repo.put({ ...shot('cache/b', 'cache/o'), takenAt: 200 });
+  f.files.delete('documents/a'); f.files.delete('documents/b');
+  const merged = await createRollRepository(f.storage).load();
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].uri, 'documents/o');
+  assert.equal(merged[0].takenAt, 200);
+
+  const g = fixture();
+  g.files.add('cache/o'); g.files.add('cache/x');
+  await g.repo.put({ ...shot('cache/o', 'cache/o'), takenAt: 100 });
+  await g.repo.put({ ...shot('cache/x', 'cache/o'), takenAt: 200 });
+  const [, intact] = await createRollRepository(g.storage).load();
+  g.files.delete('documents/x');
+  const result = await createRollRepository(g.storage).load();
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0], intact);
+});
+
+test('an entry with neither file is dropped, and a recovered one can be edited and removed', async () => {
+  const f = fixture();
+  await f.repo.put(shot());
+  f.files.delete('documents/photo'); f.files.delete('documents/original');
+  assert.deepEqual(await createRollRepository(f.storage).load(), []);
+  assert.deepEqual(f.removed, []);
+
+  const g = fixture();
+  await g.repo.put(shot());
+  g.files.delete('documents/photo');
+  const repo = createRollRepository(g.storage);
+  const [recovered] = await repo.load();
+  const edited = await repo.put({ ...recovered, uri: 'cache/edit', cameraId: 'g7x' }, recovered.uri);
+  assert.ok(g.files.has('documents/original'));
+  assert.equal(edited.entry.originalUri, 'documents/original');
+  assert.equal(edited.entry.uri, 'documents/edit');
+  await repo.remove(edited.entry.uri);
+  assert.ok(!g.files.has('documents/edit'));
+  assert.ok(!g.files.has('documents/original'));
+});
+
+test('a recovered entry and an intact entry may share one original, which outlives either removal', async () => {
+  const f = fixture();
+  for (const name of ['dev_a', 'dev_b', 'o', 'poster_a']) f.files.add(`cache/${name}`);
+  await f.repo.put({ ...shot('cache/dev_a', 'cache/o'), takenAt: 100, thumbnailUri: 'cache/poster_a' });
+  await f.repo.put({ ...shot('cache/dev_b', 'cache/o'), takenAt: 200 });
+  const before = await createRollRepository(f.storage).load();
+  const intact = before.find(e => e.uri === 'documents/dev_a')!;
+  f.files.delete('documents/dev_b');
+  const repo = createRollRepository(f.storage);
+  const roll = await repo.load();
+  assert.deepEqual(roll.map(e => e.uri), ['documents/o', 'documents/dev_a']);
+  assert.equal(roll[0].cameraId, 'original');
+  assert.equal(roll[0].takenAt, 200);
+  assert.deepEqual(roll[1], intact);
+  await repo.remove('documents/o');
+  assert.ok(f.files.has('documents/o'));
+  assert.ok(f.files.has('documents/dev_a'));
+  await repo.remove('documents/dev_a');
+  for (const uri of ['documents/o', 'documents/dev_a', 'documents/poster_a']) assert.ok(!f.files.has(uri), uri);
+});
