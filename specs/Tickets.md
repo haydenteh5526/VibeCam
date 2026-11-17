@@ -18,6 +18,18 @@ GitHub Issues holds the live backlog, acceptance checks, task checklists and dis
 
 Order: #34 and #35 are merged; #34 stays open until its share-sheet check is recorded in #36. #36 runs in January 2027 on the owner's Mac. #37, #38 and #39 follow it, are independent of each other, and each runs on an install less than 7 days old.
 
+## M2 · Ready for the January build
+
+Work that changes the app and can be finished before the January 2027 device passes, so those passes run on the version that would ship.
+
+| Issue | Type | Delivery and acceptance summary |
+| --- | --- | --- |
+| [#44 · Assess the npm audit advisories before the January build](https://github.com/haydenteh5526/VibeCam/issues/44) | Investigation | Classify the 25 advisories by whether they reach the shipped app, apply the fixes that need no Expo SDK change, and list the rest for the owner. No dependencies. [Plan](plans/2026-11-17-issue-44-dependency-audit.md) waiting for the owner's approval. |
+| [#45 · Import photos from the Photos library, including HEIC](https://github.com/haydenteh5526/VibeCam/issues/45) | Story | Import offers the Photos library and accepts HEIC. Needs #44 first. Verified on the iPhone in #37. Not planned yet. |
+| [#46 · Keep Film Roll entries whose developed file is missing](https://github.com/haydenteh5526/VibeCam/issues/46) | Story | An entry whose developed file is missing but whose original exists is kept and stays editable. No dependencies. Its plan is on `feature/issue-46-roll-orphan`. |
+
+Order: #44 and #46 are independent. #45 follows #44.
+
 ## Later, with no issue yet
 
 Open an issue when the work is about to start, or when a device pass gives it a concrete failure.
