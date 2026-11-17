@@ -66,6 +66,8 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
 - src/rollRepository.ts serializes durable commits. Original, rendered image and poster
   are retained before the index is written; only unreferenced owned files are removed afterward.
   Favourites, saved status and recipes survive restart. Bulk deletion commits once.
+  On load, an entry whose developed file is missing falls back to its retained original.
+  Nothing is deleted by that fallback.
 - src/buildReport.ts formats the seven-line build report (pure), src/buildInfo.ts reads its
   facts from the running app, and BuildDetails in Settings shows and shares it. No network,
   permission or storage.

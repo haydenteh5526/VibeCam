@@ -47,6 +47,5 @@ Results in [release readiness](../docs/RELEASE_READINESS.md#verification) dated 
 
 Found while reading the code on 15 November. None is confirmed as a user-visible fault.
 
-- `rollRepository.load()` drops a Film Roll entry whose developed file is missing even when its original still exists. The original then stays on disk with nothing pointing to it. The repository never writes an index that names a missing file, so this needs outside interference to happen.
 - Import uses the Files picker and accepts JPEG and PNG only. HEIC files and the Photos library are not offered.
 - `mobile/modules/vibecam-video/ios/VibeCamVideo.podspec` names a `vibe-cam` repository URL. It has no effect on the build.
