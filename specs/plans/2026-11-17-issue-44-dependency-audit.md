@@ -2,7 +2,7 @@
 
 > **For agentic workers:** work through this plan task by task, in the order given. Steps use checkbox (`- [ ]`) syntax for tracking. If a step cannot be done as written, or a result contradicts what this plan expects, stop and return the plan to the Architect.
 
-**Status:** revision 1, written on 17 November 2026. Waiting for the owner's approval. Nothing in this plan is done.
+**Status:** revision 1, approved by the owner on 17 November 2026 with separate approvals A, B and C as recommended and design decisions 4 to 7 as written. Nothing in this plan is done.
 
 **Goal:** Know, with evidence, which of the 25 `npm audit` advisories in `mobile/` reach the app that ships, apply every fix that needs no Expo SDK change, and give the owner the facts to decide whether an Expo upgrade must happen before the January 2027 build.
 
