@@ -3,7 +3,6 @@ import { ActivityIndicator, AppState, BackHandler, Linking, Platform, Pressable,
 import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
 import { useCameraPermissions } from 'expo-camera';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +20,8 @@ import { FILTERS, type FilterId } from './src/filters';
 import { CLOUD_FEATURES_ENABLED } from './src/constants';
 import { settingsForReleaseMode } from './src/releaseMode';
 import { DEFAULT_RECIPE, normalizeRecipe, type PhotoRecipe } from './src/photoRecipe';
+import { importPhoto } from './src/importPhoto';
+import { chooseImportSource, photoImportDeps } from './src/services/photoImport';
 
 export type GradeState = { kind: 'none' } | { kind: 'grading' } | { kind: 'graded'; name: string };
 
@@ -214,8 +215,10 @@ export default function App() {
   };
   const onCaptureVideo = async (uri: string, camera: FilterId | 'auto', durationMs: number) => { await run(() => captureVideo(uri, camera, durationMs)); };
   const onImport = () => run(async () => {
-    const result = await DocumentPicker.getDocumentAsync({ type: ['image/jpeg', 'image/png'], copyToCacheDirectory: true, multiple: false });
-    if (!result.canceled) await capturePhoto(result.assets[0].uri, effectiveSettings.defaultCamera, screen === 'roll' ? 'roll' : 'camera');
+    const source = await chooseImportSource();
+    if (!source) return;
+    const uri = await importPhoto(source, photoImportDeps);
+    if (uri) await capturePhoto(uri, effectiveSettings.defaultCamera, screen === 'roll' ? 'roll' : 'camera');
   });
   const onRegrade = (camera: FilterId | 'auto', recipe?: PhotoRecipe) => run(async () => {
     if (!photo?.originalUri) return;
