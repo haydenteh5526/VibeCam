@@ -49,14 +49,24 @@ export function createRollRepository(storage: Storage) {
   async function load(): Promise<RollEntry[]> {
     if (current) return [...current];
     const raw = normalizeRoll(await storage.read());
-    const recovered: RollEntry[] = [];
+    const kept: { entry: RollEntry; fallback: boolean }[] = [];
     for (const entry of raw) {
       const uri = await storage.resolve(entry.uri);
-      if (!await storage.exists(uri)) continue;
       const original = entry.originalUri ? await storage.resolve(entry.originalUri) : null;
+      const hasOriginal = !!original && await storage.exists(original);
       const thumbnail = entry.thumbnailUri ? await storage.resolve(entry.thumbnailUri) : null;
-      recovered.push({ ...entry, uri, originalUri: original && await storage.exists(original) ? original : null,
-        thumbnailUri: thumbnail && await storage.exists(thumbnail) ? thumbnail : null });
+      const poster = thumbnail && await storage.exists(thumbnail) ? thumbnail : null;
+      if (await storage.exists(uri)) kept.push({ fallback: false, entry: { ...entry, uri, originalUri: hasOriginal ? original : null, thumbnailUri: poster } });
+      else if (hasOriginal) kept.push({ fallback: true, entry: { ...entry, uri: original, originalUri: original, cameraId: 'original',
+        cameraName: 'Original', savedToLibrary: false, thumbnailUri: poster } });
+    }
+    // An entry with its own developed file wins; between fallbacks the earlier entry wins.
+    const taken = new Set(kept.filter(k => !k.fallback).map(k => k.entry.uri));
+    const recovered: RollEntry[] = [];
+    for (const { entry, fallback } of kept) {
+      if (fallback && taken.has(entry.uri)) continue;
+      taken.add(entry.uri);
+      recovered.push(entry);
     }
     return persist(recovered);
   }
