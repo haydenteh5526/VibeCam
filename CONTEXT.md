@@ -95,10 +95,12 @@ microphone, native image orientation, Photos, sharing or thermal behaviour.
 
 ## Next release work
 
-Produce a signed iPhone preview build using docs/DEPLOY.md; follow
-docs/RELEASE_READINESS.md on hardware. EAS and CI pin Xcode 26.2; preview and production
-use remote auto-incrementing build numbers. Settings shows the installed native version
-and build. Expo login, Apple team access and device registration are still required.
+The first device pass uses a Release build from the owner's Mac with a free Apple ID,
+planned for January 2027 (docs/DEPLOY.md, "Build on a Mac without a paid membership");
+follow docs/RELEASE_READINESS.md on hardware. The EAS preview needs the paid Apple
+Developer Program membership, Expo login, Apple team access and device registration.
+EAS and CI pin Xcode 26.2; preview and production use remote auto-incrementing build
+numbers. Settings shows the installed native version and build.
 Validate live colour preview framing, front mirroring, recording coexistence and battery
 on hardware, then calibrate against paired camera/iPhone shots.
 Video currently uses camera colour, without photo texture/date adjustments.
