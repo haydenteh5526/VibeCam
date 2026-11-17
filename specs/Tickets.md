@@ -26,9 +26,9 @@ Work that changes the app and can be finished before the January 2027 device pas
 | --- | --- | --- |
 | [#44 · Assess the npm audit advisories before the January build](https://github.com/haydenteh5526/VibeCam/issues/44) | Investigation | Classify the 25 advisories by whether they reach the shipped app, apply the fixes that need no Expo SDK change, and list the rest for the owner. No dependencies. [Plan](plans/2026-11-17-issue-44-dependency-audit.md) approved by the owner on 17 November 2026. Built on `feature/issue-44-dependency-audit`: 7 critical and high advisories classified as tooling, 25 advisories down to 18 (0 critical, 2 high), no Expo SDK change. Result in the [current state](Repo_Current_State.md). |
 | [#45 · Import photos from the Photos library, including HEIC](https://github.com/haydenteh5526/VibeCam/issues/45) | Story | Import offers the Photos library and accepts HEIC. Needs #44 first. Verified on the iPhone in #37. Not planned yet. |
-| [#46 · Keep Film Roll entries whose developed file is missing](https://github.com/haydenteh5526/VibeCam/issues/46) | Story | An entry whose developed file is missing but whose original exists is kept and stays editable. No dependencies. Its plan is on `feature/issue-46-roll-orphan`. |
+| [#46 · Keep Film Roll entries whose developed file is missing](https://github.com/haydenteh5526/VibeCam/issues/46) | Story | An entry whose developed file is missing but whose original exists is kept and stays editable. No dependencies. Merged in [PR #47](https://github.com/haydenteh5526/VibeCam/pull/47) and closed. |
 
-Order: #44 and #46 are independent. #45 follows #44.
+Order: #44 and #46 were independent; #46 is merged. #45 follows #44.
 
 ## Later, with no issue yet
 
@@ -37,7 +37,7 @@ Open an issue when the work is about to start, or when a device pass gives it a 
 - Latency, peak memory, warm-device performance and battery (walkthrough step 11). Memory profiling needs a Mac with Instruments.
 - Paired-shot calibration of the looks. See [camera fidelity](../docs/CAMERA_CALIBRATION.md).
 - Store submission: privacy and support URLs, store copy, screenshots from the signed app, and the TestFlight build.
-- Review of the npm audit advisories, and a separate Expo SDK migration if the fixes need one.
+- Expo SDK upgrade (54 to 58) to clear the 18 advisories that remain after #44. The owner decided on 17 November 2026 that it comes after the January device passes; the Architect raises it as its own issue.
 - Observations from the 15 November code reading, listed in the [repository snapshot](Repo_Current_State.md#observations-with-no-issue-yet).
 
 ## How to track work
