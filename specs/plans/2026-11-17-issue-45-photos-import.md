@@ -2,7 +2,7 @@
 
 > **For agentic workers:** implement this plan task by task, test first, in the order given. Steps use checkbox (`- [ ]`) syntax for tracking. If a step cannot be done as written, or a result contradicts what this plan expects, stop and return the plan to the Architect.
 
-**Status:** revision 1, proposed on 17 November 2026. Not approved. Nothing in this plan is implemented.
+**Status:** revision 1, approved by the owner on 17 November 2026 with separate approvals A, B and C as recommended and design decisions 4 to 8 as written. Nothing in this plan is implemented.
 
 **Goal:** On iPhone, Import offers the Photos library as well as Files; a photo chosen there, HEIC included, enters Film Roll as an upright, full-resolution JPEG and opens in the editor like a capture.
 
@@ -52,7 +52,7 @@ Read on `main` at `24838b9` and in Expo's `sdk-54` sources on 17 November 2026. 
 
 ## Global Constraints
 
-- Branch `feature/issue-45-photos-import`, which holds this plan. **Start only after #44 is merged:** first `git merge origin/main`, then install. PR to protected `main`. Do not merge.
+- Branch `feature/issue-45-photos-import`, which holds this plan. #44 is merged (`2dfbb4d`) and this branch already contains it; run `git merge origin/main` first anyway in case `main` has moved, then install. PR to protected `main`. Do not merge.
 - Code changes only in: `mobile/src/importPhoto.ts` (new), `mobile/src/services/photoImport.ts` (new), `mobile/src/__tests__/importPhoto.test.ts` (new), `mobile/App.tsx` (`onImport` and imports only), `mobile/package.json` and `mobile/package-lock.json` (only `expo-image-picker`). No change to the screens, `rollRepository.ts`, the renderers, `app.json`, `eas.json` or the workflows.
 - `mobile/src/importPhoto.ts` imports nothing from React Native or Expo, so its tests run in Node.
 - Install with `npx expo install expo-image-picker` from `mobile/`. Afterwards `expo`, `react`, `react-native` and every other `expo-*` version are unchanged (compare `npm ls expo react react-native --depth=0` and the `expo-*` versions before and after), and the lockfile contains no `58.x` Expo package.
