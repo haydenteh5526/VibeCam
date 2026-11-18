@@ -68,6 +68,11 @@ Read docs/CAMERA_CALIBRATION.md before making fidelity claims.
   Favourites, saved status and recipes survive restart. Bulk deletion commits once.
   On load, an entry whose developed file is missing falls back to its retained original.
   Nothing is deleted by that fallback.
+- Import on iPhone offers the Photos library (the system picker, which needs no Photos
+  permission) and Files, chosen from an action sheet; the browser and Android open Files
+  directly. src/importPhoto.ts decides what an import does and is tested in Node;
+  src/services/photoImport.ts holds the native pickers. A Photos import is stored as an
+  upright, full-resolution JPEG (HEIC is not kept); a Files import is stored as picked.
 - src/buildReport.ts formats the seven-line build report (pure), src/buildInfo.ts reads its
   facts from the running app, and BuildDetails in Settings shows and shares it. No network,
   permission or storage.

@@ -50,6 +50,10 @@ This is a tested development foundation, not yet a device-verified App Store bin
   photo/video filters and confirmed bulk deletion are available.
 - Save and Share use the committed edit. Failed processing retains the original;
   failed index writes preserve the previous version. Browser downloads can be retried.
+- On iPhone, Import offers the Photos library, HEIC included, as well as Files. The
+  system picker needs no Photos permission, and a Photos import is stored as an upright
+  JPEG. Unit tests cover the import decisions with fake pickers, and the browser check
+  covers only the web Files import. Photos and HEIC need the iPhone (walkthrough step 1).
 - Photos saving requests add-only permission. Import and Film Roll remain available
   without camera permission. Camera timers cancel and playback pauses on backgrounding.
 - Native video: six colour LUTs, up to 15 seconds, 720p, original retention, restyling,
@@ -133,6 +137,9 @@ Use a signed standalone build that includes the local video module: the EAS prev
 iPhone model with each result.
 
 1. Deny camera, open Film Roll and import. Enable camera in Settings and return.
+   Import from Photo Library a HEIC photo taken in portrait and one in landscape, with
+   Photos access set to None, then Limited, then Full; each opens upright in the editor
+   and develops with every look. Cancel each picker.
 2. Capture an asymmetric chart in portrait/landscape, front/back and each available
    lens. Check orientation, mirroring, framing, resolution and the copy in Photos.
 3. In airplane mode, capture/redevelop with all six looks and compare to the original.
